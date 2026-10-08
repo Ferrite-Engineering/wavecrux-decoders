@@ -1,0 +1,20 @@
+[
+{"startTime":1600,"endTime":1600,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":5200,"endTime":5600,"label":"Invalid K symbol 0x9C","isError":true,"fields":{"type":"invalid_k","symbol":"0x9C","error":"Not a PCIe control symbol."}},
+{"startTime":5600,"endTime":8800,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":10000,"endTime":10400,"label":"Invalid K symbol in packet 0x7C","isError":true,"fields":{"type":"k_in_packet","symbol":"0x7C","error":"A control symbol other than END or EDB appeared inside a packet."}},
+{"startTime":10400,"endTime":11200,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"2","first":"0x0F","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":11200,"endTime":11600,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":13200,"endTime":13600,"label":"Invalid K symbol 0xDC","isError":true,"fields":{"type":"invalid_k","symbol":"0xDC","error":"Not a PCIe control symbol."}},
+{"startTime":13600,"endTime":14400,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"2","first":"0x01","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":14800,"endTime":18000,"label":"DLLP ended by EDB","isError":true,"fields":{"type":"dllp_edb","symbols":"6","error":"A DLLP cannot be ended by EDB."}},
+{"startTime":18000,"endTime":20000,"label":"DLLP ended by EDB","isError":true,"fields":{"type":"dllp_edb","symbols":"3","error":"A DLLP cannot be ended by EDB."}},
+{"startTime":20000,"endTime":20400,"label":"Unexpected K symbol 0x1C","isError":true,"fields":{"type":"unexpected_k","symbol":"0x1C","error":"A control symbol appeared outside an ordered set or packet."}},
+{"startTime":21200,"endTime":30800,"label":"TLP frame seq=40 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"40","symbols":"22","end":"END"}},
+{"startTime":30800,"endTime":40400,"label":"TLP frame seq=41 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"41","symbols":"22","end":"END"}},
+{"startTime":40400,"endTime":50000,"label":"TLP frame seq=47 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"47","symbols":"22","end":"END"}},
+{"startTime":50000,"endTime":59600,"label":"TLP frame seq=47 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"47","symbols":"22","end":"END"}},
+{"startTime":59600,"endTime":69200,"label":"TLP frame seq=48 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"48","symbols":"22","end":"END"}},
+{"startTime":69600,"endTime":72800,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":72800,"endTime":75200,"label":"Packet truncated by end of trace","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"5","error":"The packet ended without END or EDB."}}
+]

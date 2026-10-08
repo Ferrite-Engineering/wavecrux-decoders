@@ -1,0 +1,22 @@
+# The repository style (C coding standard §5): LLVM base, 4-space indent,
+# 100 columns. `format-check` enforces it in CI.
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 100
+UseTab: Never
+PointerAlignment: Right
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AlwaysBreakBeforeMultilineStrings: false
+BreakBeforeBraces: Attach
+IndentCaseLabels: true
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+AlignConsecutiveMacros: Consecutive
+AlignEscapedNewlines: Left
+ReflowComments: true

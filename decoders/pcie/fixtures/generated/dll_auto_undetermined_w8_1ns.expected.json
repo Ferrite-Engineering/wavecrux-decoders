@@ -1,0 +1,7 @@
+[
+{"startTime":20,"endTime":52,"label":"Ack seq=1 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"1","crc":"0x0101","expected_crc":"0x1279","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":52,"endTime":132,"label":"TLP seq=0 MRd32 len=1 LCRC mismatch","isError":true,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x3AEBB9F9","replay":"false","expected_lcrc":"0x3BEBB9F9","error":"TLP LCRC does not match its contents."}},
+{"startTime":132,"endTime":152,"label":"DLLP length 3, expected 6","isError":true,"fields":{"type":"dllp_length","symbols":"3","error":"A DLLP is 6 symbols between SDP and END."}},
+{"startTime":152,"endTime":184,"label":"Nak seq=1 CRC mismatch","isError":true,"fields":{"type":"nak","seq":"1","crc":"0x0202","expected_crc":"0xF91E","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":152,"endTime":184,"label":"Scrambling: off (undetermined)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}}
+]

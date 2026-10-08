@@ -1,0 +1,9 @@
+[
+{"startTime":24000,"endTime":40000,"label":"Packet truncated by rxvalid","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"3","error":"The packet ended without END or EDB."}},
+{"startTime":56000,"endTime":72000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"1","error":"The data or datak bus carries X or Z."}},
+{"startTime":88000,"endTime":92000,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":104000,"endTime":108000,"label":"Invalid K symbol 0x9C","isError":true,"fields":{"type":"invalid_k","symbol":"0x9C","error":"Not a PCIe control symbol."}},
+{"startTime":128000,"endTime":132000,"label":"Invalid K symbol in packet 0x1C","isError":true,"fields":{"type":"k_in_packet","symbol":"0x1C","error":"A control symbol other than END or EDB appeared inside a packet."}},
+{"startTime":132000,"endTime":136000,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":136000,"endTime":144000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"2","first":"0x12","error":"Data outside a packet or ordered set; logical idle is 0x00."}}
+]

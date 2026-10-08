@@ -1,0 +1,6 @@
+[
+{"startTime":4800,"endTime":8000,"label":"Ack seq=200","isError":false,"fields":{"type":"ack","seq":"200","crc":"0xB707"}},
+{"startTime":4800,"endTime":8000,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":8000,"endTime":11200,"label":"Ack seq=201 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"201","crc":"0x066A","expected_crc":"0x161C","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":11200,"endTime":14400,"label":"Ack seq=202","isError":false,"fields":{"type":"ack","seq":"202","crc":"0xF530"}}
+]

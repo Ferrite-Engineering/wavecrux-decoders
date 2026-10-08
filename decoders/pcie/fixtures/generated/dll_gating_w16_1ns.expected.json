@@ -1,0 +1,9 @@
+[
+{"startTime":40,"endTime":72,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}},
+{"startTime":88,"endTime":120,"label":"Ack seq=2","isError":false,"fields":{"type":"ack","seq":"2","crc":"0xF155"}},
+{"startTime":120,"endTime":136,"label":"Packet truncated by rxvalid","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"3","error":"The packet ended without END or EDB."}},
+{"startTime":168,"endTime":200,"label":"Ack seq=3","isError":false,"fields":{"type":"ack","seq":"3","crc":"0x504E"}},
+{"startTime":216,"endTime":248,"label":"Ack seq=4","isError":false,"fields":{"type":"ack","seq":"4","crc":"0x370C"}},
+{"startTime":368,"endTime":384,"label":"Packet truncated by txelecidle","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"3","error":"The packet ended without END or EDB."}},
+{"startTime":416,"endTime":448,"label":"Ack seq=5","isError":false,"fields":{"type":"ack","seq":"5","crc":"0x9617"}}
+]

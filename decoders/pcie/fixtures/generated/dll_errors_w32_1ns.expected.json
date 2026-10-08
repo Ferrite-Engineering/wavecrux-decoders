@@ -1,0 +1,21 @@
+[
+{"startTime":40,"endTime":44,"label":"Invalid K symbol 0x9C","isError":true,"fields":{"type":"invalid_k","symbol":"0x9C","error":"Not a PCIe control symbol."}},
+{"startTime":48,"endTime":52,"label":"Invalid K symbol 0xDC","isError":true,"fields":{"type":"invalid_k","symbol":"0xDC","error":"Not a PCIe control symbol."}},
+{"startTime":52,"endTime":72,"label":"Packet truncated by STP","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"4","error":"The packet ended without END or EDB."}},
+{"startTime":72,"endTime":168,"label":"TLP seq=5 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"5","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0xFED487CC","replay":"false"}},
+{"startTime":168,"endTime":180,"label":"Packet truncated by SDP","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"2","error":"The packet ended without END or EDB."}},
+{"startTime":180,"endTime":212,"label":"Ack seq=5","isError":false,"fields":{"type":"ack","seq":"5","crc":"0x9617"}},
+{"startTime":212,"endTime":240,"label":"Packet truncated by COM","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"6","error":"The packet ended without END or EDB."}},
+{"startTime":264,"endTime":268,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":272,"endTime":276,"label":"EDB without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":288,"endTime":292,"label":"Invalid K symbol in packet 0xF7","isError":true,"fields":{"type":"k_in_packet","symbol":"0xF7","error":"A control symbol other than END or EDB appeared inside a packet."}},
+{"startTime":292,"endTime":324,"label":"Ack seq=6","isError":false,"fields":{"type":"ack","seq":"6","crc":"0x753B"}},
+{"startTime":340,"endTime":344,"label":"Invalid K symbol in packet 0x1C","isError":true,"fields":{"type":"k_in_packet","symbol":"0x1C","error":"A control symbol other than END or EDB appeared inside a packet."}},
+{"startTime":352,"endTime":364,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0x12","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":372,"endTime":376,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"1","first":"0xA5","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":376,"endTime":408,"label":"Ack seq=7","isError":false,"fields":{"type":"ack","seq":"7","crc":"0xD420"}},
+{"startTime":408,"endTime":472,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x00","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":480,"endTime":496,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x00","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":508,"endTime":512,"label":"Packet truncated by SDP","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"0","error":"The packet ended without END or EDB."}},
+{"startTime":512,"endTime":544,"label":"Nak seq=6","isError":false,"fields":{"type":"nak","seq":"6","crc":"0x9E5C"}}
+]

@@ -1,0 +1,12 @@
+[
+{"startTime":16000,"endTime":16000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":32000,"endTime":160000,"label":"EIEOS ×2","isError":false,"fields":{"type":"eieos","count":"2"}},
+{"startTime":160000,"endTime":288000,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen2","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x06","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":288000,"endTime":300000,"label":"Idle ×3","isError":false,"fields":{"type":"idle","symbols":"3"}},
+{"startTime":300000,"endTime":364000,"label":"EIEOS","isError":false,"fields":{"type":"eieos","count":"1"}},
+{"startTime":364000,"endTime":384000,"label":"Idle ×5","isError":false,"fields":{"type":"idle","symbols":"5"}},
+{"startTime":384000,"endTime":416000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":416000,"endTime":432000,"label":"Idle ×4","isError":false,"fields":{"type":"idle","symbols":"4"}},
+{"startTime":432000,"endTime":496000,"label":"EIEOS","isError":false,"fields":{"type":"eieos","count":"1"}},
+{"startTime":496000,"endTime":512000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
+]

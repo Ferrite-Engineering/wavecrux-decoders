@@ -1,0 +1,19 @@
+[
+{"startTime":16000,"endTime":16000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":32000,"endTime":64000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":64000,"endTime":160000,"label":"TLP frame seq=4090 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4090","symbols":"22","end":"END"}},
+{"startTime":160000,"endTime":192000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":192000,"endTime":288000,"label":"TLP frame seq=4091 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4091","symbols":"22","end":"END"}},
+{"startTime":292000,"endTime":324000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":324000,"endTime":436000,"label":"TLP frame seq=4092 (26 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4092","symbols":"26","end":"END"}},
+{"startTime":436000,"endTime":468000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":468000,"endTime":564000,"label":"TLP frame seq=4093 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4093","symbols":"22","end":"END"}},
+{"startTime":568000,"endTime":600000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":600000,"endTime":728000,"label":"TLP frame seq=4094 (30 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4094","symbols":"30","end":"END"}},
+{"startTime":728000,"endTime":760000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":760000,"endTime":856000,"label":"TLP frame seq=4095 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4095","symbols":"22","end":"END"}},
+{"startTime":860000,"endTime":892000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":892000,"endTime":988000,"label":"TLP frame seq=0 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"22","end":"END"}},
+{"startTime":988000,"endTime":1020000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":1020000,"endTime":1116000,"label":"TLP frame seq=1 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"1","symbols":"22","end":"END"}}
+]

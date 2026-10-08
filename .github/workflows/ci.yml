@@ -1,0 +1,205 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Ferrite Engineering LLC
+#
+# Every gate in docs/standards/, on every platform a decoder ships for.
+# Cost control (operations standard §6): every job has timeout-minutes, and
+# macOS (10x the minute price) runs on pull requests, weekly and on demand,
+# not on every push.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 0" # Sundays: the full matrix plus the long fuzz run
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CLANG_FORMAT_VERSION: "23.1.3"
+  CLANG_TIDY_VERSION: "22.1.8"
+
+jobs:
+  lint:
+    name: Format, tidy, cppcheck, REUSE, fixtures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cppcheck clang-18
+          python3 -m pip install --user "clang-format==${CLANG_FORMAT_VERSION}" "clang-tidy==${CLANG_TIDY_VERSION}" reuse
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Configure (compile_commands.json for clang-tidy)
+        # Clang, so compile_commands.json carries flags clang-tidy understands
+        # (GCC's -Wcast-align=strict is unknown to it).
+        run: cmake --preset dev -DCMAKE_C_COMPILER=clang-18 -DWCX_CLANG_FORMAT="$HOME/.local/bin/clang-format" -DWCX_CLANG_TIDY="$HOME/.local/bin/clang-tidy"
+      - name: clang-format
+        run: cmake --build --preset dev --target format-check
+      - name: clang-tidy
+        run: cmake --build --preset dev --target tidy
+      - name: cppcheck
+        run: cmake --build --preset dev --target cppcheck
+      - name: REUSE (licence and copyright on every file)
+        run: reuse lint
+      - name: No references an outside reader cannot follow
+        run: python3 tools/check_private_refs.py
+      - name: ABI header matches the WaveCrux open core
+        run: python3 tools/check_abi_header.py
+      - name: Generated fixtures are reproducible
+        run: |
+          for gen in decoders/*/tools/generate_fixtures.py; do
+            [ -f "$gen" ] || continue
+            python3 "$gen" --check
+          done
+
+  linux-gcc:
+    name: Linux · GCC 13 (release toolchain, glibc 2.35)
+    runs-on: ubuntu-22.04 # pinned: the glibc floor of every shipped .so
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Install GCC 13
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 ninja-build
+      - run: cmake --preset ci-linux-gcc -DCMAKE_C_COMPILER=gcc-13
+      - run: cmake --build --preset ci-linux-gcc
+      - run: ctest --preset ci-linux-gcc --output-on-failure
+      - name: glibc floor
+        run: |
+          libs=$(find build/ci-linux-gcc -name 'libwcx_*.so' -not -name 'libwcx_test_*')
+          if [ -z "$libs" ]; then echo "::notice::no plugin libraries built"; exit 0; fi
+          python3 tools/check_glibc.py --max 2.35 $libs
+
+  linux-clang:
+    name: Linux · Clang 18
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang-18 ninja-build
+      - run: cmake --preset ci-linux-clang -DCMAKE_C_COMPILER=clang-18
+      - run: cmake --build --preset ci-linux-clang
+      - run: ctest --preset ci-linux-clang --output-on-failure
+
+  sanitizers:
+    name: Linux · ASan + UBSan + LSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang-18 ninja-build
+      - run: cmake --preset ci-asan -DCMAKE_C_COMPILER=clang-18
+      - run: cmake --build --preset ci-asan
+      - name: Tests under sanitizers (LeakSanitizer is Linux-only, so leaks are checked here)
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --preset ci-asan --output-on-failure
+
+  fuzz:
+    name: Fuzz (60 s per target; 30 min weekly)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang-18 libclang-rt-18-dev ninja-build
+      - run: cmake --preset fuzz -DCMAKE_C_COMPILER=clang-18
+      - run: cmake --build --preset fuzz
+      - name: Regression corpus replays clean
+        run: ctest --preset fuzz --output-on-failure
+      - name: Fuzz every target
+        env:
+          ASAN_OPTIONS: quarantine_size_mb=64:detect_leaks=1
+          FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '1800' || '60' }}
+        run: |
+          status=0
+          for target in build/fuzz/bin/fuzz_*; do
+            name=$(basename "$target")
+            corpus="build/fuzz/corpus/$name"
+            mkdir -p "$corpus"
+            seeds=$(find decoders common -path "*/fuzz/corpus" -type d | tr '\n' ' ')
+            echo "::group::$name"
+            "$target" -max_total_time="$FUZZ_SECONDS" -rss_limit_mb=512 -timeout=5 \
+              -artifact_prefix="build/fuzz/$name-" "$corpus" $seeds || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+      - name: Keep any crashing input
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-crashes
+          path: build/fuzz/fuzz_*-*
+          if-no-files-found: ignore
+
+  coverage:
+    name: Coverage (decoders ≥ 95 % lines, ≥ 90 % branches)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang-18 llvm-18 ninja-build
+      - run: cmake --preset coverage -DCMAKE_C_COMPILER=clang-18 -DWCX_LLVM_PROFDATA=/usr/bin/llvm-profdata-18 -DWCX_LLVM_COV=/usr/bin/llvm-cov-18
+      - run: cmake --build --preset coverage
+      - run: ctest --preset coverage --output-on-failure
+      - name: Floors per decoder
+        run: |
+          status=0
+          for dir in decoders/*/; do
+            [ -d "$dir/src" ] || continue
+            python3 tools/coverage_report.py --build-dir build/coverage --source-dir . \
+              --llvm-profdata /usr/bin/llvm-profdata-18 --llvm-cov /usr/bin/llvm-cov-18 \
+              --only "$dir" --fail-under-line 95 --fail-under-branch 90 || status=1
+          done
+          exit $status
+
+  windows:
+    name: Windows · MSVC (/W4 /WX /analyze)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - run: cmake --preset ci-windows-msvc
+      - name: Build (keep going, so one run shows every MSVC diagnostic)
+        run: cmake --build --preset ci-windows-msvc -- -k 0
+      - run: ctest --preset ci-windows-msvc --output-on-failure
+
+  macos:
+    name: macOS · universal (arm64 + x86_64)
+    if: github.event_name != 'push'
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - run: brew install ninja
+      - run: cmake --preset ci-macos-universal
+      - run: cmake --build --preset ci-macos-universal
+      - run: ctest --preset ci-macos-universal --output-on-failure
+      - name: Both slices present, macOS 12.0 floor
+        run: |
+          for lib in $(find build/ci-macos-universal -name 'libwcx_*.dylib' -not -name 'libwcx_test_*' -not -path '*.dSYM/*'); do
+            lipo -archs "$lib"
+            lipo -archs "$lib" | grep -q arm64
+            lipo -archs "$lib" | grep -q x86_64
+            vtool -show-build "$lib" | grep -q 'minos 12.0'
+          done

@@ -1,0 +1,6 @@
+[
+{"startTime":300,"endTime":332,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":300,"endTime":332,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":332,"endTime":364,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":364,"endTime":444,"label":"TLP seq=0 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x9AE8F8C2","replay":"false"}}
+]

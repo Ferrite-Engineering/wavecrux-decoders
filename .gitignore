@@ -1,0 +1,40 @@
+# Build trees (CMakePresets.json puts every preset under build/).
+/build/
+/out/
+cmake-build-*/
+CMakeUserPresets.json
+
+# Compiler and linker by-products outside a build tree.
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.dSYM/
+*.debug
+
+# Coverage and fuzzing artefacts.
+*.profraw
+*.profdata
+crash-*
+leak-*
+timeout-*
+oom-*
+slow-unit-*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editors and OS noise.
+.vscode/
+.idea/
+.DS_Store
+*.swp

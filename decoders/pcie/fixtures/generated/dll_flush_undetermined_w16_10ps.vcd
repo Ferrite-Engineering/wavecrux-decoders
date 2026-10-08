@@ -1,0 +1,67 @@
+$version wavecrux-decoders decoders/pcie/tools/generate_fixtures.py $end
+$timescale 10ps $end
+$scope module tb $end
+$scope module dut $end
+$var wire 1 ! pclk $end
+$var reg 16 " rx_data [15:0] $end
+$var reg 2 # rx_datak [1:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0!
+b0001110010111100 "
+b11 #
+$end
+#800
+1!
+b0001110000011100 "
+#1200
+0!
+#1600
+1!
+b0000000001011100 "
+b01 #
+#2000
+0!
+#2400
+1!
+b0000000000000000 "
+b00 #
+#2800
+0!
+#3200
+1!
+b0000000000000011 "
+#3600
+0!
+#4000
+1!
+b1111110100000000 "
+b10 #
+#4400
+0!
+#4800
+1!
+b0000000000000000 "
+b00 #
+#5200
+0!
+#5600
+1!
+b0000000001011100 "
+b01 #
+#6000
+0!
+#6400
+1!
+b0000000000000000 "
+b00 #
+#6800
+0!
+#7200
+1!
+#7600
+0!
+#8000

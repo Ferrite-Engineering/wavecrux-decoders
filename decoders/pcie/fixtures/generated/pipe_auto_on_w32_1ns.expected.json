@@ -1,0 +1,10 @@
+[
+{"startTime":16,"endTime":16,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":32,"endTime":288,"label":"TS1 ×4 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"4","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":288,"endTime":416,"label":"TS2 ×2 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":448,"endTime":480,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":448,"endTime":480,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
+{"startTime":496,"endTime":528,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":528,"endTime":608,"label":"TLP frame seq=0 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"18","end":"END"}},
+{"startTime":624,"endTime":640,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
+]

@@ -1,0 +1,11 @@
+[
+{"startTime":24000,"endTime":56000,"label":"Ack seq=12 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"12","crc":"0x0000","expected_crc":"0x3FD1","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":56000,"endTime":88000,"label":"InitFC1-P VC0 H=32 D=1008 CRC mismatch","isError":true,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BD","expected_crc":"0x35BC","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":88000,"endTime":120000,"label":"Vendor 0x123456 CRC mismatch","isError":true,"fields":{"type":"vendor","payload":"0x123456","crc":"0xFFFF","expected_crc":"0x6021","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":120000,"endTime":152000,"label":"Nak seq=5","isError":false,"fields":{"type":"nak","seq":"5","crc":"0x7D70"}},
+{"startTime":152000,"endTime":180000,"label":"DLLP length 5, expected 6","isError":true,"fields":{"type":"dllp_length","symbols":"5","error":"A DLLP is 6 symbols between SDP and END."}},
+{"startTime":180000,"endTime":216000,"label":"DLLP length 7, expected 6","isError":true,"fields":{"type":"dllp_length","symbols":"7","error":"A DLLP is 6 symbols between SDP and END."}},
+{"startTime":216000,"endTime":228000,"label":"DLLP length 1, expected 6","isError":true,"fields":{"type":"dllp_length","symbols":"1","error":"A DLLP is 6 symbols between SDP and END."}},
+{"startTime":228000,"endTime":260000,"label":"PM_Request_Ack CRC mismatch","isError":true,"fields":{"type":"pm_request_ack","crc":"0x0102","expected_crc":"0x930C","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":260000,"endTime":292000,"label":"Ack seq=13","isError":false,"fields":{"type":"ack","seq":"13","crc":"0x9ECA"}}
+]

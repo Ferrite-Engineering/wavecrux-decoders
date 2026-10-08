@@ -1,0 +1,5 @@
+[
+{"startTime":600,"endTime":2200,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":2200,"endTime":5400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":2200,"endTime":5400,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}}
+]

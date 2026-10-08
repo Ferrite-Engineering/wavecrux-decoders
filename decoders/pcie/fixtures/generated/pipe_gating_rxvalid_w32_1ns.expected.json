@@ -1,0 +1,7 @@
+[
+{"startTime":16,"endTime":16,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":48,"endTime":80,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":112,"endTime":144,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":144,"endTime":176,"label":"Packet truncated by rxvalid","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"7","error":"The packet ended without END or EDB."}},
+{"startTime":232,"endTime":264,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+]

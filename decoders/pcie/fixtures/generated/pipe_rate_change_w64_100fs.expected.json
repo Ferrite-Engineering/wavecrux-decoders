@@ -1,0 +1,10 @@
+[
+{"startTime":3,"endTime":3,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":3,"endTime":180008,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen2","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x06","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":180007,"endTime":340012,"label":"TS2 ×2 link=0 lane=0 n_fts=24 gen2","isError":false,"fields":{"type":"ts2","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x86","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":360012,"endTime":380013,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":380012,"endTime":450017,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen2","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x06","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":450016,"endTime":470018,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":470017,"endTime":520020,"label":"TLP frame seq=0 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"18","end":"END"}},
+{"startTime":520020,"endTime":530021,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
+]

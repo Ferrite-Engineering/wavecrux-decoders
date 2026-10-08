@@ -1,0 +1,8 @@
+[
+{"startTime":204000,"endTime":236000,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":264000,"endTime":408000,"label":"TLP seq=0 MWr64 len=3","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr64","length_dw":"3","tc":"0","td":"false","ep":"false","bytes":"28","lcrc":"0xE64C95A1","replay":"false"}},
+{"startTime":408000,"endTime":440000,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":456000,"endTime":552000,"label":"TLP seq=1 CplD len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"CplD","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0xD3D8DB27","replay":"false"}},
+{"startTime":560000,"endTime":568000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"2","first":"0x0F","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":576000,"endTime":608000,"label":"Ack seq=1 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"1","crc":"0x0001","expected_crc":"0x1279","error":"DLLP CRC-16 does not match its contents."}}
+]

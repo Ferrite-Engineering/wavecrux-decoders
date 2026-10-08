@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Ferrite Engineering LLC
+#
+# Sign the Windows library of an already-published release, without
+# rebuilding it: for a release that was cut before the repository's signing
+# secrets existed. Downloads the release's Windows archive, signs the DLL
+# with Azure Trusted Signing (the account that signs WaveCrux), verifies the
+# Authenticode signature, repackages it with tools/release.py and uploads the
+# archive as a workflow artifact. A maintainer then regenerates SHA256SUMS
+# and catalog.json (tools/release.py finalize) and replaces the three release
+# assets. New releases sign in release.yml and never need this.
+
+name: Sign a released Windows library
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. pcie-v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download and unpack the released archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          plugin="${TAG%-v*}"
+          version="${TAG##*-v}"
+          echo "PLUGIN=$plugin" >> "$GITHUB_ENV"
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" \
+            -p "wcx-$plugin-$version-windows-x64.zip" -D released
+          mkdir -p to-sign
+          unzip -q "released/wcx-$plugin-$version-windows-x64.zip" -d unpacked
+          cp "unpacked/wcx_$plugin.dll" to-sign/
+
+      - name: Sign (Azure Trusted Signing)
+        uses: azure/trusted-signing-action@0d74250c661747df006298d0fb49944c10f16e03 # v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_TS_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_TS_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_TS_PROFILE }}
+          files-folder: to-sign
+          files-folder-filter: dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify the signature
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem to-sign -Filter *.dll | Select-Object -First 1
+          $sig = Get-AuthenticodeSignature $dll.FullName
+          "Status: $($sig.Status)"
+          "Signer: $($sig.SignerCertificate.Subject)"
+          "Timestamp: $($sig.TimeStamperCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "signature is $($sig.Status)" }
+
+      - name: Repackage
+        shell: bash
+        run: |
+          python3 tools/release.py package --plugin "$PLUGIN" --platform windows_x64 \
+            --build-dir to-sign --out dist
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-windows
+          path: dist/
+          if-no-files-found: error

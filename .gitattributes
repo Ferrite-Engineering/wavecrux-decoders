@@ -1,0 +1,25 @@
+# Normalise text to LF in the repository. Golden output is compared byte for
+# byte on all three platforms, so a checkout must never rewrite line endings
+# in fixtures or expected files.
+* text=auto eol=lf
+
+*.c text eol=lf
+*.h text eol=lf
+*.py text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Fixtures: byte-exact, never converted, never diffed as prose.
+*.vcd -text diff
+*.expected.json -text
+*.bindings.json -text
+**/fuzz/corpus/** -text -diff
+**/fuzz/regressions/** -text -diff
+
+# The vendored ABI header is compared byte for byte with upstream.
+include/wavecrux_decoder.h -text
+
+*.png binary
+*.bin binary

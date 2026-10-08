@@ -1,0 +1,223 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Ferrite Engineering LLC
+#
+# One plugin, one version, all three platforms (operations standard §4).
+# Triggered only by a tag <plugin>-v<semver>. Every platform builds from the
+# tag, runs the full test suite, is signed where the platform has signing,
+# and is packaged; then one job checksums everything, writes the catalog
+# entry and creates the GitHub Release.
+#
+# Signing uses the same secret and variable names as WaveCrux's own desktop
+# release. If any platform could not be signed because its signing secrets are
+# not configured, the release is created as a DRAFT: an unsigned macOS library
+# will not load in notarized WaveCrux, so nothing unsigned is published by
+# accident.
+
+name: Release
+
+on:
+  push:
+    tags: ["*-v[0-9]*"]
+  # Dry run: build, test, sign and notarize an existing tag on all three
+  # platforms and keep the archives as workflow artifacts. Publishes nothing.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to dry-run, e.g. pcie-v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux_x64
+            os: ubuntu-22.04 # pinned: glibc floor
+            preset: ci-linux-gcc
+          - platform: windows_x64
+            os: windows-latest
+            preset: ci-windows-msvc
+          - platform: macos_universal
+            os: macos-latest
+            preset: ci-macos-universal
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      SOURCE_DATE_EPOCH: "1767225600" # 2026-01-01T00:00:00Z, for reproducible archives and binaries
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Plugin from the tag
+        id: tag
+        shell: bash
+        run: |
+          tag="${RELEASE_TAG}"
+          plugin="${tag%-v*}"
+          [ -d "decoders/$plugin" ] || { echo "::error::no decoders/$plugin for tag $tag"; exit 1; }
+          echo "plugin=$plugin" >> "$GITHUB_OUTPUT"
+
+      - name: Toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 ninja-build
+      - name: Toolchain (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - name: Toolchain (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      - name: Configure
+        shell: bash
+        run: |
+          extra=()
+          [ "$RUNNER_OS" = "Linux" ] && extra+=(-DCMAKE_C_COMPILER=gcc-13)
+          cmake --preset ${{ matrix.preset }} "${extra[@]}"
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Test (the full suite gates the release)
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+      - name: glibc floor
+        if: runner.os == 'Linux'
+        run: python3 tools/check_glibc.py --max 2.35 $(find build/${{ matrix.preset }} -name 'libwcx_${{ steps.tag.outputs.plugin }}.so')
+
+      # ── macOS: Developer ID, hardened runtime, notarization ──────────────
+      - name: Sign (macOS)
+        id: sign_macos
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          lib=$(find build/${{ matrix.preset }} -name 'libwcx_${{ steps.tag.outputs.plugin }}.dylib' -not -path '*.dSYM/*')
+          if [ -z "$MACOS_CERT_P12_BASE64" ]; then
+            echo "::warning::macOS signing secrets are not configured; the release will be a draft"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          kc_pass=$(openssl rand -hex 16)
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 900 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$keychain" > /dev/null
+          codesign --force --timestamp --options runtime \
+            --sign "Developer ID Application: Ferrite Engineering LLC (7957R7M965)" "$lib"
+          codesign --verify --strict --verbose=2 "$lib"
+          ditto -c -k --keepParent "$lib" "$RUNNER_TEMP/notarize.zip"
+          out=$(xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$NOTARY_APPLE_ID" \
+            --team-id 7957R7M965 --password "$NOTARY_PASSWORD" --wait 2>&1) || true
+          echo "$out"
+          # Check the outcome, not the exit code: an Invalid submission is a
+          # completed submission.
+          echo "$out" | grep -q "status: Accepted" || { echo "::error::notarization was not accepted"; exit 1; }
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      # ── Windows: Authenticode through Azure Trusted Signing ──────────────
+      - name: Stage DLL for signing (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p to-sign
+          cp "$(find build/${{ matrix.preset }} -name 'wcx_${{ steps.tag.outputs.plugin }}.dll')" to-sign/
+      - name: Sign (Windows)
+        if: runner.os == 'Windows' && vars.AZURE_TS_ENDPOINT != ''
+        uses: azure/trusted-signing-action@0d74250c661747df006298d0fb49944c10f16e03 # v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_TS_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_TS_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_TS_PROFILE }}
+          files-folder: to-sign
+          files-folder-filter: dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Package
+        shell: bash
+        run: |
+          build="build/${{ matrix.preset }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then build="to-sign"; fi
+          python3 tools/release.py package --plugin ${{ steps.tag.outputs.plugin }} \
+            --platform ${{ matrix.platform }} --build-dir "$build" --out dist
+          signed=true
+          if [ "$RUNNER_OS" = "macOS" ] && [ "${{ steps.sign_macos.outputs.signed }}" != "true" ]; then signed=false; fi
+          if [ "$RUNNER_OS" = "Windows" ] && [ -z "${{ vars.AZURE_TS_ENDPOINT }}" ]; then signed=false; fi
+          echo "$signed" > "dist/${{ matrix.platform }}.signed"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-${{ matrix.platform }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Checksums, catalog, GitHub Release
+    needs: build
+    if: github.event_name == 'push' # a dry run never publishes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write # build-provenance attestation (OIDC)
+      attestations: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Finalize
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          python3 tools/release.py finalize --plugin "${tag%-v*}" --tag "$tag" --dist dist --repo "$GITHUB_REPOSITORY"
+      # Build provenance (operations standard §4). GitHub offers attestations
+      # only to public repositories on the current plan, so the step is
+      # skipped while the repository is private.
+      - name: Attest build provenance
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.zip
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          draft=""
+          if grep -l false dist/*.signed > /dev/null 2>&1; then
+            draft="--draft"
+            echo "::warning::at least one platform is unsigned; creating a DRAFT release"
+          fi
+          prerelease=""
+          case "$tag" in *-v0.*) prerelease="--prerelease" ;; esac
+          gh release create "$tag" $draft $prerelease --title "$tag" \
+            --notes-file dist/RELEASE_NOTES.md \
+            dist/*.zip dist/SHA256SUMS dist/catalog.json

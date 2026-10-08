@@ -1,0 +1,11 @@
+# Each plugin directory has an owner; an outside maintainer owns their own.
+# Shared plumbing, the standards and CI need a Ferrite review.
+
+*                       @martin-robert-fink
+/decoders/pcie/         @martin-robert-fink
+/common/                @martin-robert-fink
+/cmake/                 @martin-robert-fink
+/include/               @martin-robert-fink
+/tools/                 @martin-robert-fink
+/docs/standards/        @martin-robert-fink
+/.github/               @martin-robert-fink

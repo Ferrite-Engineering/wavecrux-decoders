@@ -1,0 +1,4 @@
+{
+  "decoder": "wcx.test.count",
+  "signal_bindings": {"clk": "t.u.clk_alias"}
+}

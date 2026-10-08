@@ -1,0 +1,7 @@
+[
+{"startTime":8,"endTime":136,"label":"TS1 ×2 link=PAD lane=PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","link":"PAD","lane":"PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":136,"endTime":152,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":164,"endTime":196,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":196,"endTime":276,"label":"TLP frame seq=1 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"1","symbols":"18","end":"END"}},
+{"startTime":280,"endTime":312,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+]

@@ -1,0 +1,4 @@
+[
+{"startTime":187,"endTime":288,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":337,"endTime":588,"label":"TLP seq=0 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x9AE8F8C2","replay":"false"}}
+]

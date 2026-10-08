@@ -1,0 +1,10 @@
+[
+{"startTime":240000,"endTime":560000,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":560000,"endTime":1520000,"label":"TLP seq=7 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"7","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x66FE0A2F","replay":"false"}},
+{"startTime":1520000,"endTime":1840000,"label":"UpdateFC-P VC0 H=1 D=3","isError":false,"fields":{"type":"updatefc_p","vc":"0","hdr_fc":"1","data_fc":"3","crc":"0xC65F"}},
+{"startTime":1840000,"endTime":2800000,"label":"TLP seq=8 MRd64 len=2","isError":false,"fields":{"type":"tlp","seq":"8","tlp":"MRd64","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x1C13C69D","replay":"false"}},
+{"startTime":2840000,"endTime":3160000,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}},
+{"startTime":3160000,"endTime":4280000,"label":"TLP seq=9 MWr32 len=2","isError":false,"fields":{"type":"tlp","seq":"9","tlp":"MWr32","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"20","lcrc":"0x04AB07F9","replay":"false"}},
+{"startTime":4280000,"endTime":4600000,"label":"UpdateFC-P VC0 H=2 D=11","isError":false,"fields":{"type":"updatefc_p","vc":"0","hdr_fc":"2","data_fc":"11","crc":"0xFA31"}},
+{"startTime":4600000,"endTime":5560000,"label":"TLP seq=10 MRd64 len=2","isError":false,"fields":{"type":"tlp","seq":"10","tlp":"MRd64","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0xC3A38A02","replay":"false"}}
+]

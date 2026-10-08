@@ -1,0 +1,19 @@
+[
+{"startTime":40000,"endTime":44000,"label":"Invalid K symbol 0x9C","isError":true,"fields":{"type":"invalid_k","symbol":"0x9C","error":"Not a PCIe control symbol."}},
+{"startTime":44000,"endTime":76000,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}},
+{"startTime":88000,"endTime":92000,"label":"Invalid K symbol in packet 0x7C","isError":true,"fields":{"type":"k_in_packet","symbol":"0x7C","error":"A control symbol other than END or EDB appeared inside a packet."}},
+{"startTime":92000,"endTime":100000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"2","first":"0x0F","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":100000,"endTime":104000,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":120000,"endTime":124000,"label":"Invalid K symbol 0xDC","isError":true,"fields":{"type":"invalid_k","symbol":"0xDC","error":"Not a PCIe control symbol."}},
+{"startTime":124000,"endTime":132000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"2","first":"0x01","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":136000,"endTime":168000,"label":"DLLP ended by EDB","isError":true,"fields":{"type":"dllp_edb","symbols":"6","error":"A DLLP cannot be ended by EDB."}},
+{"startTime":168000,"endTime":188000,"label":"DLLP ended by EDB","isError":true,"fields":{"type":"dllp_edb","symbols":"3","error":"A DLLP cannot be ended by EDB."}},
+{"startTime":188000,"endTime":192000,"label":"Unexpected K symbol 0x1C","isError":true,"fields":{"type":"unexpected_k","symbol":"0x1C","error":"A control symbol appeared outside an ordered set or packet."}},
+{"startTime":200000,"endTime":296000,"label":"TLP seq=40 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"40","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x59F73EB9","replay":"false"}},
+{"startTime":296000,"endTime":392000,"label":"TLP seq=41 MWr32 len=2 LCRC mismatch length mismatch","isError":true,"fields":{"type":"tlp","seq":"41","tlp":"MWr32","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x44C43C82","replay":"false","expected_lcrc":"0x45C43C82","error":"TLP LCRC does not match its contents. The header Length field does not match the framed payload."}},
+{"startTime":392000,"endTime":488000,"label":"TLP seq=47 MWr32 len=2 length mismatch sequence error","isError":true,"fields":{"type":"tlp","seq":"47","tlp":"MWr32","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x172958C0","replay":"false","expected_seq":"41","error":"The header Length field does not match the framed payload. The sequence number is neither the next expected one nor a replay."}},
+{"startTime":488000,"endTime":584000,"label":"TLP seq=47 MWr32 len=4 length mismatch (replay)","isError":true,"fields":{"type":"tlp","seq":"47","tlp":"MWr32","length_dw":"4","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x4FA667FD","replay":"true","error":"The header Length field does not match the framed payload."}},
+{"startTime":584000,"endTime":680000,"label":"TLP seq=48 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"48","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0xAE1AD0C7","replay":"false"}},
+{"startTime":684000,"endTime":716000,"label":"Reserved DLLP 0x02","isError":true,"fields":{"type":"reserved","byte0":"0x02","crc":"0x4832","error":"This DLLP type is reserved in PCIe Gen1 and Gen2."}},
+{"startTime":716000,"endTime":728000,"label":"Packet truncated by end of trace","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"2","error":"The packet ended without END or EDB."}}
+]

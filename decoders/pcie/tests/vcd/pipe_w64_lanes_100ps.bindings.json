@@ -1,0 +1,5 @@
+{
+  "decoder": "ferrite.pcie_pipe_w64",
+  "signal_bindings": {"pclk": "tb.pclk", "data": "tb.data", "datak": "tb.datak"},
+  "parameters": {"scrambling": "off", "sample_point": "at_edge", "show_idle": true}
+}

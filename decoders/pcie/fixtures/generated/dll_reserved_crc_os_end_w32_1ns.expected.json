@@ -1,0 +1,6 @@
+[
+{"startTime":32,"endTime":64,"label":"Reserved DLLP 0x01 CRC mismatch","isError":true,"fields":{"type":"reserved","byte0":"0x01","crc":"0x0000","expected_crc":"0xC69A","error":"This DLLP type is reserved in PCIe Gen1 and Gen2. DLLP CRC-16 does not match its contents."}},
+{"startTime":64,"endTime":96,"label":"Reserved DLLP 0x48","isError":true,"fields":{"type":"reserved","byte0":"0x48","crc":"0xF3BE","error":"This DLLP type is reserved in PCIe Gen1 and Gen2."}},
+{"startTime":96,"endTime":128,"label":"Ack seq=7","isError":false,"fields":{"type":"ack","seq":"7","crc":"0xD420"}},
+{"startTime":128,"endTime":160,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x4A","error":"COM was not followed by a recognised ordered set."}}
+]

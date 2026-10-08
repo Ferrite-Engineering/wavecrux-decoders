@@ -1,0 +1,6 @@
+[
+{"startTime":10,"endTime":11,"label":"D=0xA5","isError":false,"fields":{"data":"0xA5","edge":"1","repeat":"0"}},
+{"startTime":50,"endTime":51,"label":"data is X or Z at the rising edge","isError":true,"fields":{"edge":"3"}},
+{"startTime":70,"endTime":71,"label":"D=0xFF","isError":false,"fields":{"data":"0xFF","edge":"4","repeat":"0"}},
+{"startTime":10,"endTime":80,"label":"edges=4","isError":false,"fields":{"edges":"4","samples":"13"}}
+]

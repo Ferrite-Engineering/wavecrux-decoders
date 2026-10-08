@@ -1,0 +1,4 @@
+{
+  "decoder": "ferrite.pcie_pipe_w8",
+  "signal_bindings": {"pclk": "tb.pclk", "data": "tb.data", "datak": "tb.datak"}
+}

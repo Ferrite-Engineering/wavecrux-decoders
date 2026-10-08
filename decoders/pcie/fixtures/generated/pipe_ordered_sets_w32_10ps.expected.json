@@ -1,0 +1,21 @@
+[
+{"startTime":1600,"endTime":1600,"label":"SKP ×1","isError":false,"fields":{"type":"skp","skp_symbols":"1"}},
+{"startTime":1600,"endTime":3600,"label":"SKP ×2","isError":false,"fields":{"type":"skp","skp_symbols":"2"}},
+{"startTime":3600,"endTime":5200,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":5200,"endTime":7200,"label":"SKP ×4","isError":false,"fields":{"type":"skp","skp_symbols":"4"}},
+{"startTime":7200,"endTime":9600,"label":"SKP ×5","isError":false,"fields":{"type":"skp","skp_symbols":"5"}},
+{"startTime":9600,"endTime":16000,"label":"FTS ×4","isError":false,"fields":{"type":"fts","count":"4"}},
+{"startTime":16000,"endTime":17600,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":17600,"endTime":30400,"label":"TS1 ×2 link=7 lane=0 n_fts=255 gen2","isError":false,"fields":{"type":"ts1","count":"2","link":"7","lane":"0","n_fts":"255","rate_id":"0x06","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":30400,"endTime":36800,"label":"TS1 link=7 lane=0 n_fts=255 gen2","isError":false,"fields":{"type":"ts1","count":"1","link":"7","lane":"0","n_fts":"255","rate_id":"0x86","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":36800,"endTime":43200,"label":"TS2 link=7 lane=0 n_fts=255 gen2","isError":false,"fields":{"type":"ts2","count":"1","link":"7","lane":"0","n_fts":"255","rate_id":"0x06","training_control":"0x01","hot_reset":"true","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":43200,"endTime":49600,"label":"TS1 link=7 lane=0 n_fts=255 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"7","lane":"0","n_fts":"255","rate_id":"0x02","training_control":"0x02","hot_reset":"false","disable_link":"true","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":49600,"endTime":56000,"label":"TS1 link=7 lane=0 n_fts=255 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"7","lane":"0","n_fts":"255","rate_id":"0x02","training_control":"0x04","hot_reset":"false","disable_link":"false","loopback":"true","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":56000,"endTime":62400,"label":"TS1 link=7 lane=0 n_fts=255 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"7","lane":"0","n_fts":"255","rate_id":"0x02","training_control":"0x08","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"true","compliance_receive":"false"}},
+{"startTime":62400,"endTime":68800,"label":"TS1 link=7 lane=0 n_fts=255 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"7","lane":"0","n_fts":"255","rate_id":"0x02","training_control":"0x10","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"true"}},
+{"startTime":68800,"endTime":75200,"label":"TS2 link=PAD lane=PAD n_fts=1 gen1","isError":false,"fields":{"type":"ts2","count":"1","link":"PAD","lane":"PAD","n_fts":"1","rate_id":"0x02","training_control":"0x1F","hot_reset":"true","disable_link":"true","loopback":"true","disable_scrambling":"true","compliance_receive":"true"}},
+{"startTime":75200,"endTime":76800,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":76800,"endTime":78400,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":78400,"endTime":97600,"label":"EIEOS ×3","isError":false,"fields":{"type":"eieos","count":"3"}},
+{"startTime":97600,"endTime":100800,"label":"FTS ×2","isError":false,"fields":{"type":"fts","count":"2"}}
+]

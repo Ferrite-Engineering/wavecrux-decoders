@@ -1,0 +1,4 @@
+[
+{"startTime":2200,"endTime":5400,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":2200,"endTime":5400,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}}
+]

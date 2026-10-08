@@ -1,0 +1,4 @@
+{
+  "decoder": "wcx.test.echo",
+  "signal_bindings": {"clk": "tb.clk", "data": "tb.data"}
+}

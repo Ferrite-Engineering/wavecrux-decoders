@@ -1,0 +1,133 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {"major": 3, "minor": 21, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "Debug build",
+      "inherits": "base",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}
+    },
+    {
+      "name": "asan",
+      "displayName": "Debug + AddressSanitizer + UndefinedBehaviorSanitizer",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "WCX_SANITIZE": "address,undefined"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "RelWithDebInfo + release hardening, debug info split off",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "WCX_SPLIT_DEBUG": "ON"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Clang source-based coverage (LLVM clang; override with -DCMAKE_C_COMPILER)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "WCX_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "libFuzzer + ASan/UBSan (LLVM clang; Homebrew LLVM on macOS; override with -DCMAKE_C_COMPILER)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "WCX_FUZZ": "ON"
+      }
+    },
+    {
+      "name": "ci-linux-gcc",
+      "displayName": "CI: Linux, GCC, release, every §7 flag required",
+      "inherits": "release",
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux"},
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "WCX_REQUIRE_ALL_FLAGS": "ON"
+      }
+    },
+    {
+      "name": "ci-linux-clang",
+      "displayName": "CI: Linux, Clang, release, every §7 flag required",
+      "inherits": "release",
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux"},
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "WCX_REQUIRE_ALL_FLAGS": "ON"
+      }
+    },
+    {
+      "name": "ci-asan",
+      "displayName": "CI: sanitizers, every §7 flag required",
+      "inherits": "asan",
+      "cacheVariables": {"WCX_REQUIRE_ALL_FLAGS": "ON"}
+    },
+    {
+      "name": "ci-macos-universal",
+      "displayName": "CI: macOS universal (arm64 + x86_64), Apple clang, release",
+      "inherits": "release",
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin"},
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+        "WCX_REQUIRE_ALL_FLAGS": "ON"
+      }
+    },
+    {
+      "name": "ci-windows-msvc",
+      "displayName": "CI: Windows, MSVC (run from a developer prompt), release",
+      "inherits": "release",
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows"},
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "WCX_REQUIRE_ALL_FLAGS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {"name": "dev", "configurePreset": "dev"},
+    {"name": "asan", "configurePreset": "asan"},
+    {"name": "release", "configurePreset": "release"},
+    {"name": "coverage", "configurePreset": "coverage"},
+    {"name": "fuzz", "configurePreset": "fuzz"},
+    {"name": "ci-linux-gcc", "configurePreset": "ci-linux-gcc"},
+    {"name": "ci-linux-clang", "configurePreset": "ci-linux-clang"},
+    {"name": "ci-asan", "configurePreset": "ci-asan"},
+    {"name": "ci-macos-universal", "configurePreset": "ci-macos-universal"},
+    {"name": "ci-windows-msvc", "configurePreset": "ci-windows-msvc"}
+  ],
+  "testPresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error", "stopOnFailure": false}
+    },
+    {"name": "dev", "inherits": "base", "configurePreset": "dev"},
+    {"name": "asan", "inherits": "base", "configurePreset": "asan"},
+    {"name": "release", "inherits": "base", "configurePreset": "release"},
+    {"name": "coverage", "inherits": "base", "configurePreset": "coverage"},
+    {"name": "fuzz", "inherits": "base", "configurePreset": "fuzz"},
+    {"name": "ci-linux-gcc", "inherits": "base", "configurePreset": "ci-linux-gcc"},
+    {"name": "ci-linux-clang", "inherits": "base", "configurePreset": "ci-linux-clang"},
+    {"name": "ci-asan", "inherits": "base", "configurePreset": "ci-asan"},
+    {"name": "ci-macos-universal", "inherits": "base", "configurePreset": "ci-macos-universal"},
+    {"name": "ci-windows-msvc", "inherits": "base", "configurePreset": "ci-windows-msvc"}
+  ]
+}

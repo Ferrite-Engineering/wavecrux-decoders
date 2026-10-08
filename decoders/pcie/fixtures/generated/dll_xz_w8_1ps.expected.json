@@ -1,0 +1,8 @@
+[
+{"startTime":20000,"endTime":52000,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}},
+{"startTime":60000,"endTime":72000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"3","error":"The data or datak bus carries X or Z."}},
+{"startTime":80000,"endTime":112000,"label":"Ack seq=2","isError":false,"fields":{"type":"ack","seq":"2","crc":"0xF155"}},
+{"startTime":112000,"endTime":116000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"1","error":"The data or datak bus carries X or Z."}},
+{"startTime":120000,"endTime":128000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"2","error":"The data or datak bus carries X or Z."}},
+{"startTime":128000,"endTime":160000,"label":"Ack seq=3","isError":false,"fields":{"type":"ack","seq":"3","crc":"0x504E"}}
+]

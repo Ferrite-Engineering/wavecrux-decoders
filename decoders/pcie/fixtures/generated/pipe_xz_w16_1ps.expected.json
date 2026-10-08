@@ -1,0 +1,9 @@
+[
+{"startTime":4000,"endTime":12000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":12000,"endTime":28000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":32000,"endTime":44000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"3","error":"The data or datak bus carries X or Z."}},
+{"startTime":52000,"endTime":68000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":68000,"endTime":72000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"1","error":"The data or datak bus carries X or Z."}},
+{"startTime":76000,"endTime":84000,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"2","error":"The data or datak bus carries X or Z."}},
+{"startTime":84000,"endTime":100000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+]

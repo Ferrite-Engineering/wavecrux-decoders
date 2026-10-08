@@ -1,0 +1,8 @@
+{
+  "decoder": "ferrite.pcie_dll_w64",
+  "signal_bindings": {
+    "pclk": "tb_dll_logic.phy_clk",
+    "data": "tb_dll_logic.phy_tx_data",
+    "datak": "tb_dll_logic.phy_tx_data_k"
+  }
+}

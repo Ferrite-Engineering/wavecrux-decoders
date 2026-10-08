@@ -1,0 +1,18 @@
+{
+  "name": "PCIe decoders (PIPE, Data Link Layer)",
+  "library": "wcx_pcie",
+  "abi_major": 1,
+  "min_wavecrux": "1.0.1",
+  "license": "Apache-2.0",
+  "maintainer": "Ferrite Engineering",
+  "decoders": [
+    {"id": "ferrite.pcie_pipe_w8", "name": "PCIe PIPE (8-bit)"},
+    {"id": "ferrite.pcie_pipe_w16", "name": "PCIe PIPE (16-bit)"},
+    {"id": "ferrite.pcie_pipe_w32", "name": "PCIe PIPE (32-bit)"},
+    {"id": "ferrite.pcie_pipe_w64", "name": "PCIe PIPE (64-bit)"},
+    {"id": "ferrite.pcie_dll_w8", "name": "PCIe Data Link Layer (8-bit)"},
+    {"id": "ferrite.pcie_dll_w16", "name": "PCIe Data Link Layer (16-bit)"},
+    {"id": "ferrite.pcie_dll_w32", "name": "PCIe Data Link Layer (32-bit)"},
+    {"id": "ferrite.pcie_dll_w64", "name": "PCIe Data Link Layer (64-bit)"}
+  ]
+}

@@ -1,0 +1,18 @@
+[
+{"startTime":24000,"endTime":40000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":40000,"endTime":168000,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":168000,"endTime":192000,"label":"Idle ×6","isError":false,"fields":{"type":"idle","symbols":"6"}},
+{"startTime":192000,"endTime":208000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":208000,"endTime":224000,"label":"Idle ×4","isError":false,"fields":{"type":"idle","symbols":"4"}},
+{"startTime":224000,"endTime":256000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":256000,"endTime":264000,"label":"Idle ×2","isError":false,"fields":{"type":"idle","symbols":"2"}},
+{"startTime":264000,"endTime":376000,"label":"TLP frame seq=4 (26 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"4","symbols":"26","end":"END"}},
+{"startTime":376000,"endTime":388000,"label":"Idle ×3","isError":false,"fields":{"type":"idle","symbols":"3"}},
+{"startTime":388000,"endTime":400000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0x11","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":400000,"endTime":412000,"label":"Idle ×3","isError":false,"fields":{"type":"idle","symbols":"3"}},
+{"startTime":412000,"endTime":420000,"label":"SKP ×1","isError":false,"fields":{"type":"skp","skp_symbols":"1"}},
+{"startTime":420000,"endTime":428000,"label":"Idle ×2","isError":false,"fields":{"type":"idle","symbols":"2"}},
+{"startTime":428000,"endTime":460000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":460000,"endTime":472000,"label":"Idle ×3","isError":false,"fields":{"type":"idle","symbols":"3"}},
+{"startTime":472000,"endTime":488000,"label":"EIOS","isError":false,"fields":{"type":"eios"}}
+]

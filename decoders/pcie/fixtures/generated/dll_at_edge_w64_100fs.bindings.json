@@ -1,0 +1,12 @@
+{
+  "decoder": "ferrite.pcie_dll_w64",
+  "signal_bindings": {
+    "pclk": "tb.dut.pclk",
+    "data": "tb.dut.rx_data",
+    "datak": "tb.dut.rx_datak"
+  },
+  "parameters": {
+    "scrambling": "off",
+    "sample_point": "at_edge"
+  }
+}

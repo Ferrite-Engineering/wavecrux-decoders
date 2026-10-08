@@ -1,0 +1,6 @@
+[
+{"startTime":5,"endTime":6,"label":"D=0x5A","isError":false,"fields":{"data":"0x5A","edge":"1","repeat":"0"}},
+{"startTime":15,"endTime":16,"label":"D=0xC3","isError":false,"fields":{"data":"0xC3","edge":"2","repeat":"0"}},
+{"startTime":25,"endTime":26,"label":"D=0x0F","isError":false,"fields":{"data":"0x0F","edge":"3","repeat":"0"}},
+{"startTime":5,"endTime":30,"label":"edges=3","isError":false,"fields":{"edges":"3","samples":"7"}}
+]

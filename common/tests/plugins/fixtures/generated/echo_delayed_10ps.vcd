@@ -1,0 +1,43 @@
+$timescale 10ps $end
+$scope module tb $end
+$scope module dut $end
+$var reg 1 a clk $end
+$var reg 8 b data $end
+$var reg 1 c valid $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0a
+bx b
+0c
+$end
+#3
+b10100101 b
+1c
+#10
+1a
+#13
+b1 b
+0c
+#20
+0a
+#30
+1a
+#33
+bz1 b
+1c
+#40
+0a
+#50
+1a
+#53
+b11111111 b
+#60
+0a
+#70
+1a
+#80
+0a
+#90

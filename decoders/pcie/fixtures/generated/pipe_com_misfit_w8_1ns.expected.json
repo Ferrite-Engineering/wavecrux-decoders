@@ -1,0 +1,15 @@
+[
+{"startTime":8,"endTime":40,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":56,"endTime":72,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFB","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":72,"endTime":112,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"5","first":"0x0A","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":112,"endTime":120,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":136,"endTime":152,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x5C","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":152,"endTime":176,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0x10","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":176,"endTime":184,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":192,"endTime":208,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":232,"endTime":248,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFD","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":256,"endTime":272,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFE","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":288,"endTime":352,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":352,"endTime":368,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":368,"endTime":400,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
+]

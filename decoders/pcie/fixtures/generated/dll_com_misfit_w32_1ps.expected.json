@@ -1,0 +1,14 @@
+[
+{"startTime":40000,"endTime":48000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFB","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":48000,"endTime":68000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"5","first":"0x0A","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":68000,"endTime":72000,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":80000,"endTime":88000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x5C","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":88000,"endTime":100000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0x10","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":100000,"endTime":104000,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
+{"startTime":108000,"endTime":116000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":128000,"endTime":136000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFD","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":140000,"endTime":148000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFE","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":156000,"endTime":188000,"label":"Ack seq=8","isError":false,"fields":{"type":"ack","seq":"8","crc":"0xBBBF"}},
+{"startTime":156000,"endTime":188000,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":188000,"endTime":196000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}}
+]

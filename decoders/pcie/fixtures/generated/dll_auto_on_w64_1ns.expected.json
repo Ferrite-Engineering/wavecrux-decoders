@@ -1,0 +1,8 @@
+[
+{"startTime":49,"endTime":50,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"1","first":"0x42","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
+{"startTime":52,"endTime":60,"label":"Ack seq=0 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"0","crc":"0x0000","expected_crc":"0xB362","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":63,"endTime":83,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
+{"startTime":63,"endTime":83,"label":"TLP seq=0 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x81440E56","replay":"false"}},
+{"startTime":83,"endTime":91,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":95,"endTime":115,"label":"TLP seq=1 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x6846AEEC","replay":"false"}}
+]

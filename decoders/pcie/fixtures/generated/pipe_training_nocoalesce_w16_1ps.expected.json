@@ -1,0 +1,16 @@
+[
+{"startTime":4000,"endTime":36000,"label":"TS1 link=PAD lane=PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"PAD","lane":"PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":36000,"endTime":68000,"label":"TS1 link=PAD lane=PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"PAD","lane":"PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":68000,"endTime":100000,"label":"TS1 link=PAD lane=PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"PAD","lane":"PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":100000,"endTime":132000,"label":"TS2 link=3 lane=0 n_fts=128 gen2","isError":false,"fields":{"type":"ts2","count":"1","link":"3","lane":"0","n_fts":"128","rate_id":"0x06","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":132000,"endTime":164000,"label":"TS2 link=3 lane=0 n_fts=128 gen2","isError":false,"fields":{"type":"ts2","count":"1","link":"3","lane":"0","n_fts":"128","rate_id":"0x06","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":164000,"endTime":172000,"label":"FTS","isError":false,"fields":{"type":"fts","count":"1"}},
+{"startTime":172000,"endTime":180000,"label":"FTS","isError":false,"fields":{"type":"fts","count":"1"}},
+{"startTime":180000,"endTime":188000,"label":"FTS","isError":false,"fields":{"type":"fts","count":"1"}},
+{"startTime":188000,"endTime":196000,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":196000,"endTime":228000,"label":"EIEOS","isError":false,"fields":{"type":"eieos","count":"1"}},
+{"startTime":228000,"endTime":260000,"label":"EIEOS","isError":false,"fields":{"type":"eieos","count":"1"}},
+{"startTime":260000,"endTime":268000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":268000,"endTime":300000,"label":"TS1 link=3 lane=0 n_fts=128 gen2","isError":false,"fields":{"type":"ts1","count":"1","link":"3","lane":"0","n_fts":"128","rate_id":"0x06","training_control":"0x01","hot_reset":"true","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":300000,"endTime":306000,"label":"SKP ×2","isError":false,"fields":{"type":"skp","skp_symbols":"2"}}
+]

@@ -1,0 +1,12 @@
+{
+  "decoder": "ferrite.pcie_pipe_w16",
+  "signal_bindings": {
+    "pclk": "tb.dut.pclk",
+    "data": "tb.dut.rx_data",
+    "datak": "tb.dut.rx_datak"
+  },
+  "parameters": {
+    "scrambling": "off",
+    "coalesce": false
+  }
+}

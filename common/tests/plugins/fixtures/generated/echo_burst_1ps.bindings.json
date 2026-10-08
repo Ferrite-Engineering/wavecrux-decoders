@@ -1,0 +1,5 @@
+{
+  "decoder": "wcx.test.echo",
+  "signal_bindings": {"clk": "top.clk", "data": "top.bus[7:0]"},
+  "parameters": {"repeat": 20, "sample_point": "at_edge", "prefix": "p\"\\", "emit_summary": false}
+}

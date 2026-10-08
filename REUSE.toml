@@ -1,0 +1,45 @@
+version = 1
+SPDX-PackageName = "wavecrux-decoders"
+SPDX-PackageSupplier = "Ferrite Engineering LLC <support@ferriteengineering.com>"
+SPDX-PackageDownloadLocation = "https://github.com/Ferrite-Engineering/wavecrux-decoders"
+
+# Files that cannot carry an SPDX header (data, configuration, documentation)
+# are Apache-2.0 unless a more specific annotation below says otherwise.
+[[annotations]]
+path = [
+    "**/*.md",
+    "**/*.json",
+    "**/*.vcd",
+    "**/*.seed",
+    "**/*.toml",
+    "**/VERSION",
+    "**/regressions/**",
+    "**/corpus/**",
+    ".github/**",
+    ".clang-format",
+    ".clang-tidy",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore",
+    "NOTICE",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Ferrite Engineering LLC"
+SPDX-License-Identifier = "Apache-2.0"
+
+# The WaveCrux plugin ABI header, vendored byte for byte from the open core
+# (which is Apache-2.0); it cannot carry our header without drifting.
+[[annotations]]
+path = ["include/wavecrux_decoder.h"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Ferrite Engineering LLC"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Captured waveforms are produced by the openCologne-PCIE testbench and RTL
+# and keep its BSD-3-Clause licence and notice (see PROVENANCE.md). Our
+# bindings, expectations and provenance notes next to them stay Apache-2.0.
+[[annotations]]
+path = ["decoders/pcie/fixtures/captured/**/*.vcd"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Chili.CHIPS*ba"
+SPDX-License-Identifier = "BSD-3-Clause"

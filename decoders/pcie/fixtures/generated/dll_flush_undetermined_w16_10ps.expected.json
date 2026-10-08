@@ -1,0 +1,5 @@
+[
+{"startTime":2400,"endTime":5600,"label":"Ack seq=3 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"3","crc":"0x0000","expected_crc":"0x504E","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":6400,"endTime":8000,"label":"Packet truncated by end of trace","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"3","error":"The packet ended without END or EDB."}},
+{"startTime":6400,"endTime":8000,"label":"Scrambling: off (undetermined)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}}
+]

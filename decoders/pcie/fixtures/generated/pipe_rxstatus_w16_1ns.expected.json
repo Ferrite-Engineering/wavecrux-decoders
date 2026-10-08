@@ -1,0 +1,14 @@
+[
+{"startTime":8,"endTime":24,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":32,"endTime":40,"label":"RxStatus: SKP added","isError":false,"fields":{"type":"rxstatus","code":"0b001"}},
+{"startTime":56,"endTime":64,"label":"RxStatus: SKP removed","isError":false,"fields":{"type":"rxstatus","code":"0b010"}},
+{"startTime":64,"endTime":72,"label":"RxStatus: receiver detected","isError":false,"fields":{"type":"rxstatus","code":"0b011"}},
+{"startTime":88,"endTime":96,"label":"RxStatus: 8b/10b decode error","isError":true,"fields":{"type":"rxstatus","code":"0b100","error":"8b/10b decode error reported by the PHY."}},
+{"startTime":112,"endTime":120,"label":"RxStatus: 8b/10b decode error","isError":true,"fields":{"type":"rxstatus","code":"0b100","error":"8b/10b decode error reported by the PHY."}},
+{"startTime":120,"endTime":128,"label":"RxStatus: elastic buffer overflow","isError":true,"fields":{"type":"rxstatus","code":"0b101","error":"Elastic buffer overflow reported by the PHY."}},
+{"startTime":128,"endTime":136,"label":"RxStatus: elastic buffer underflow","isError":true,"fields":{"type":"rxstatus","code":"0b110","error":"Elastic buffer underflow reported by the PHY."}},
+{"startTime":136,"endTime":144,"label":"RxStatus: disparity error","isError":true,"fields":{"type":"rxstatus","code":"0b111","error":"Disparity error reported by the PHY."}},
+{"startTime":152,"endTime":160,"label":"RxStatus: SKP added","isError":false,"fields":{"type":"rxstatus","code":"0b001"}},
+{"startTime":168,"endTime":200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":200,"endTime":216,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
+]

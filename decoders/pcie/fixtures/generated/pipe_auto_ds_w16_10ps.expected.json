@@ -1,0 +1,7 @@
+[
+{"startTime":800,"endTime":7200,"label":"Scrambling: off (training sets)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":800,"endTime":13600,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x08","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"true","compliance_receive":"false"}},
+{"startTime":13600,"endTime":16800,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":16800,"endTime":18400,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":19200,"endTime":22400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+]

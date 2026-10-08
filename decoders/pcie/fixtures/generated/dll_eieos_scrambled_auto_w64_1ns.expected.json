@@ -1,0 +1,5 @@
+[
+{"startTime":60,"endTime":68,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
+{"startTime":60,"endTime":68,"label":"UpdateFC-P VC0 H=8 D=64","isError":false,"fields":{"type":"updatefc_p","vc":"0","hdr_fc":"8","data_fc":"64","crc":"0x3428"}},
+{"startTime":103,"endTime":127,"label":"TLP seq=0 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x357DC8EF","replay":"false"}}
+]

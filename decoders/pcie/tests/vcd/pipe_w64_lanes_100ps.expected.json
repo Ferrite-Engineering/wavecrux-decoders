@@ -1,0 +1,7 @@
+[
+{"startTime":50,"endTime":188,"label":"Idle ×11","isError":false,"fields":{"type":"idle","symbols":"11"}},
+{"startTime":187,"endTime":288,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":287,"endTime":338,"label":"Idle ×4","isError":false,"fields":{"type":"idle","symbols":"4"}},
+{"startTime":337,"endTime":588,"label":"TLP frame seq=0 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"18","end":"END"}},
+{"startTime":587,"endTime":750,"label":"Idle ×13","isError":false,"fields":{"type":"idle","symbols":"13"}}
+]

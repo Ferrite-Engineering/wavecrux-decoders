@@ -1,0 +1,5 @@
+[
+{"startTime":800,"endTime":7200,"label":"Scrambling: off (training sets)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":13600,"endTime":16800,"label":"Ack seq=9 CRC mismatch","isError":true,"fields":{"type":"ack","seq":"9","crc":"0x28AC","expected_crc":"0x1AA4","error":"DLLP CRC-16 does not match its contents."}},
+{"startTime":19200,"endTime":22400,"label":"Ack seq=10","isError":false,"fields":{"type":"ack","seq":"10","crc":"0xF988"}}
+]

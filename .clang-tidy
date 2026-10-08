@@ -1,0 +1,80 @@
+# C coding standard §8: bugprone, cert, clang-analyzer (security.* and
+# unix.Malloc included), misc, performance, portability and readability,
+# warnings as errors. Only purely cosmetic checks, or checks that cannot
+# apply to C, are disabled; each has its reason in the list below.
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -cert-dcl16-c,
+  -readability-uppercase-literal-suffix,
+  -readability-math-missing-parentheses,
+  -readability-trailing-comma,
+  -readability-avoid-nested-conditional-operator,
+  -misc-include-cleaner,
+  -readability-implicit-bool-conversion
+
+# Why each disabled check is off:
+#   bugprone-easily-swappable-parameters: every time API takes (start_fs,
+#     end_fs) and every buffer API (ptr, len); flagging all of them is noise.
+#   clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling:
+#     demands Annex K memcpy_s/snprintf_s, which glibc and macOS do not ship;
+#     banned.h (§6) is the enforced list.
+#   readability-identifier-length: cosmetic.
+#   readability-magic-numbers: cosmetic here; protocol constants carry their
+#     spec citation inline (§5).
+#   cert-dcl16-c, readability-uppercase-literal-suffix: cosmetic (case of
+#     literal suffixes).
+#   readability-math-missing-parentheses: cosmetic.
+#   readability-trailing-comma: cosmetic; clang-format owns layout.
+#   readability-avoid-nested-conditional-operator: cosmetic.
+#   misc-include-cleaner: include-what-you-use advice; misfires on the
+#     force-included banned.h and on types reached through the ABI header.
+#   readability-implicit-bool-conversion: C's comparison and logical
+#     operators yield int, so it fires on every `return x == y;` from a bool
+#     function (measured: 60+ findings, none a real conversion).
+
+WarningsAsErrors: '*'
+# Our headers only; the leading slash keeps the repository's own name
+# ("wavecrux-decoders/include/...") from matching "decoders/".
+HeaderFilterRegex: '/(common|tools|decoders)/.*\.h$'
+FormatStyle: file
+CheckOptions:
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '30'
+  # The ABI header's own macros shift and mask with plain literals.
+  - key: bugprone-signed-bitwise.IgnorePositiveIntegerLiterals
+    value: 'true'
+  # Test and assertion macros expand to branches the reader never sees.
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: 'true'
+  - key: readability-function-size.LineThreshold
+    value: '90'
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  # libFuzzer's fixed entry point.
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '^LLVMFuzzerTestOneInput$'
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.StructCase
+    value: lower_case
+  - key: readability-identifier-naming.TypedefCase
+    value: lower_case
+  - key: bugprone-assert-side-effect.AssertMacros
+    value: 'WCX_ASSERT'

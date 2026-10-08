@@ -1,0 +1,5 @@
+[
+{"startTime":4,"endTime":20,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":20,"endTime":148,"label":"TS2 ×2 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":148,"endTime":468,"label":"TS1 ×5 link=PAD lane=PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"5","link":"PAD","lane":"PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}}
+]

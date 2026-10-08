@@ -1,0 +1,19 @@
+wavecrux-decoders
+Copyright 2026 Ferrite Engineering LLC and the contributors named in each file.
+
+This product includes software developed at Ferrite Engineering LLC
+(https://ferriteengineering.com), licensed under the Apache License,
+Version 2.0 (see LICENSE).
+
+include/wavecrux_decoder.h is the WaveCrux decoder plugin ABI header,
+Copyright 2026 Ferrite Engineering LLC, Apache License 2.0, vendored unchanged
+from https://github.com/Ferrite-Engineering/wavecrux.
+
+Third-party components vendored under third_party/ are listed here with their
+licences. There are none at present.
+
+Fixtures under decoders/*/fixtures/captured/ are derived from the projects
+named in each directory's PROVENANCE.md and keep those projects' licences
+and notices.
+
+WaveCrux is a trademark of Ferrite Engineering LLC.

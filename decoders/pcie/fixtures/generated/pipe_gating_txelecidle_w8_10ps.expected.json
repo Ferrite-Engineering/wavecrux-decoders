@@ -1,0 +1,10 @@
+[
+{"startTime":400,"endTime":2000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":2000,"endTime":5200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":5200,"endTime":6800,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":9200,"endTime":12400,"label":"FTS ×2","isError":false,"fields":{"type":"fts","count":"2"}},
+{"startTime":12400,"endTime":14000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":14800,"endTime":16400,"label":"Packet truncated by txelecidle","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"3","error":"The packet ended without END or EDB."}},
+{"startTime":18400,"endTime":21600,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":21600,"endTime":23200,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
+]

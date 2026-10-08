@@ -1,0 +1,6 @@
+[
+{"startTime":8000,"endTime":136000,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":136000,"endTime":168000,"label":"FTS ×2","isError":false,"fields":{"type":"fts","count":"2"}},
+{"startTime":168000,"endTime":200000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":204000,"endTime":216000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x3C","error":"COM was not followed by a recognised ordered set."}}
+]
