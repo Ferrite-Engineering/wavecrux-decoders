@@ -1,0 +1,27 @@
+name: Feature request
+description: Something a decoder should decode, check or show, or a new decoder
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to see or check
+      description: The debugging task, in your own words. Concrete is better than general.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like the decoder to do
+      description: For example a new field, a new error check, a new input signal, or a new protocol. Cite the specification section if there is one.
+  - type: textarea
+    id: example
+    attributes:
+      label: Example traffic
+      description: A waveform or simulation that shows the case, if you have one.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to help build or test this (see CONTRIBUTING.md).

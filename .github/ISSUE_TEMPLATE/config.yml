@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem privately
+    url: https://github.com/Ferrite-Engineering/wavecrux-decoders/blob/main/SECURITY.md
+    about: A crash, hang or out-of-bounds access on some input. Please do not file these publicly.
+  - name: A problem in WaveCrux itself
+    url: https://github.com/Ferrite-Engineering/wavecrux/issues
+    about: Loading plugins, the decoder picker, signal binding, or anything not specific to one decoder.

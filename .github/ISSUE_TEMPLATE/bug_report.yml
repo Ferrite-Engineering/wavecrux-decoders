@@ -1,0 +1,50 @@
+name: Decoder bug
+description: A decoder shows the wrong transaction, misses one, or crashes
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time. A waveform that shows the problem is the most useful thing you can attach: the smallest VCD or FST you can share, and the decoder bindings you used.
+
+        A crash, hang or unbounded memory growth on some input is a **security bug**: please report it privately as described in [SECURITY.md](https://github.com/Ferrite-Engineering/wavecrux-decoders/blob/main/SECURITY.md), not here.
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Plugin
+      options:
+        - PCIe (PIPE / Data Link Layer)
+        - Other (say which below)
+    validations:
+      required: true
+  - type: input
+    id: decoder
+    attributes:
+      label: Decoder id and version
+      description: The decoder id (for example ferrite.pcie_dll_w64) and the plugin release (for example pcie-v0.1.0).
+    validations:
+      required: true
+  - type: input
+    id: wavecrux
+    attributes:
+      label: WaveCrux version and platform
+      description: Help > About in WaveCrux, and macOS, Windows or Linux.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the decoder showed, and what you expected
+      description: Include the transaction label and its time if you can, and which specification rule you think applies.
+    validations:
+      required: true
+  - type: textarea
+    id: bindings
+    attributes:
+      label: Signal bindings and parameters
+      description: Which waveform signals you bound to each decoder input, and any parameter you changed (scrambling, sample point, ...).
+  - type: textarea
+    id: waveform
+    attributes:
+      label: Waveform
+      description: Drag a small VCD or FST here (zip it if GitHub refuses the extension), or link to the simulation that produces it.
