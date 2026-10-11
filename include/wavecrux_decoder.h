@@ -11,7 +11,7 @@
 // ABI (C, C++, Rust, Zig, …). Authors compile against this header and ship
 // the resulting library.
 //
-// Status: Experimental, ABI version 1.1. This contract follows the
+// Status: Experimental, ABI version 1.2. This contract follows the
 // versioning policy described in `CONTRIBUTING.md` ("Contributing a decoder
 // plugin"). The short version:
 //
@@ -84,7 +84,7 @@ extern "C" {
 // whose MAJOR component does not match the host's MAJOR.
 
 #define WAVECRUX_DECODER_ABI_MAJOR 1
-#define WAVECRUX_DECODER_ABI_MINOR 1
+#define WAVECRUX_DECODER_ABI_MINOR 2
 
 // The combined version word: (MAJOR << 16) | MINOR. Returned by
 // `wavecrux_decoder_abi_version`. Use the helper macros
@@ -120,6 +120,10 @@ typedef void* WcDecoderHandle;
 // One sample of bit-level signal data.
 //
 // `bits_ptr` points to a packed-LSB-first bit array of length `bit_width`.
+// `bit_width` is the sum of the bound signals' widths, packed in manifest
+// declaration order. A signal whose manifest entry names a `width_param`
+// (ABI 1.2) is packed at that parameter's configured width, so a plugin
+// reads the same parameter from `config_json` to find each signal's offset.
 // Each byte holds up to 8 bits; the trailing high bits of the final byte
 // are unspecified for `bit_width` not divisible by 8 — plugins must mask
 // them when reading. Special values (0/1/x/z) for VCD-style 4-state data
@@ -222,6 +226,23 @@ typedef struct WcDecoderDef {
     // emits. Required keys: "signals" (array of {name, bit_width?,
     // optional?}), "parameters" (array of {name, kind, default?}).
     // Additional keys are reserved for forward extension.
+    //
+    // ABI 1.2 adds two optional keys to a signal entry, for a bus that
+    // comes in several widths:
+    //
+    //   {"name": "data",  "bit_width": 64, "width_param": "data_width",
+    //    "width_scale": 1}
+    //   {"name": "datak", "bit_width": 8,  "width_param": "data_width",
+    //    "width_scale": 0.125}
+    //
+    // `width_param` names a declared parameter; the host packs the signal
+    // at that parameter's value times `width_scale` (default 1, must be
+    // positive, rounded up), falls back to `bit_width` when the value is
+    // not an integer, and uses the same width to auto-bind and to filter
+    // the signal picker. A `width_param` that names no declared parameter
+    // makes the manifest invalid. An older host ignores both keys and
+    // packs at `bit_width`, so one decoder still works there when bound to
+    // signals of that width.
     const char* manifest_json;
 
     // Lifecycle callbacks. All are required in ABI 1.0.
