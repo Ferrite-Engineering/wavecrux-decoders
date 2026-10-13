@@ -28,7 +28,7 @@ import urllib.request
 UPSTREAM_URL = (
     "https://raw.githubusercontent.com/Ferrite-Engineering/wavecrux/main/include/wavecrux_decoder.h"
 )
-VENDORED_SHA256 = "0a8f7289f43062b2fa4c87847801d1959c3ca8e39f6238757a36bc5adb1266a5"
+VENDORED_SHA256 = "7eda7c76c832849f6acf63b8a63e93da4dbba7a6963863c2d592ed36087c2430"
 LOCAL = pathlib.Path(__file__).resolve().parent.parent / "include" / "wavecrux_decoder.h"
 
 
