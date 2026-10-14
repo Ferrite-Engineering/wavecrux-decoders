@@ -62,6 +62,12 @@ jobs:
             [ -f "$gen" ] || continue
             python3 "$gen" --check
           done
+      - name: Testbench stimulus is reproducible and decodes as listed
+        run: |
+          for exp in decoders/*/tools/export_stimulus.py; do
+            [ -f "$exp" ] || continue
+            python3 "$exp" --check
+          done
 
   linux-gcc:
     name: Linux · GCC 13 (release toolchain, glibc 2.35)

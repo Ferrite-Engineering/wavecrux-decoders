@@ -11,6 +11,8 @@ path = [
     "**/*.json",
     "**/*.vcd",
     "**/*.seed",
+    "decoders/*/stimulus/*.hex",
+    "decoders/*/stimulus/*.txt",
     "**/*.toml",
     "**/VERSION",
     "**/regressions/**",

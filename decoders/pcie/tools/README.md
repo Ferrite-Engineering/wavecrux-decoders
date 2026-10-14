@@ -12,12 +12,14 @@ or shares code with `../src/`.
 | `pcie_fixture_lib.py` | The encoder: bit-serial CRC-16, LCRC-32 and scrambler; units to PIPE symbols; x1 lane packing (byte lane j = j-th symbol); the VCD writer; a model of the WaveCrux host; and the SPEC rules that turn the encoded units into expected transactions. |
 | `pcie_ref_decoder.py` | A small reference decoder in the decoding direction, written separately from the SPEC with different CRC implementations (reflected CRC-16, zlib). It makes the captured fixtures' expected files and cross-checks the generator. |
 | `capture_check.py` | `check()`: captured expected files equal the reference decoder's output. Run directly, it cross-checks the reference decoder against every generated fixture. |
+| `export_stimulus.py` | Writes `../stimulus/`: `$readmemh` receive stimulus for RTL testbenches, built by the same encoder, with a manifest per file. Each file is decoded back by the reference decoder before it is written; `--check` fails on drift; `--lanes 1/2/4` writes other bus widths. See [`../stimulus/README.md`](../stimulus/README.md). |
 | `make_captured.py` | Rebuilds `../fixtures/captured/` from a public openCologne-PCIE checkout ([PROVENANCE](../fixtures/captured/PROVENANCE.md)). |
 
 ```
 python3 decoders/pcie/tools/generate_fixtures.py          # regenerate (about 2 s)
 python3 decoders/pcie/tools/generate_fixtures.py --check  # what CI runs
 python3 decoders/pcie/tools/capture_check.py              # reference-decoder cross-check
+python3 decoders/pcie/tools/export_stimulus.py --check    # testbench stimulus is current
 ```
 
 Python 3.10+, standard library only, deterministic (payload bytes come from a
