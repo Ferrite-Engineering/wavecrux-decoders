@@ -1,0 +1,18 @@
+[
+{"startTime":76999,"endTime":96999,"label":"Symbol lock (Gen2, 5.0 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen2"}},
+{"startTime":76999,"endTime":716999,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen2","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x86","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":716999,"endTime":796999,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":796999,"endTime":956999,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":956999,"endTime":1036999,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":1036999,"endTime":1066999,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}},
+{"startTime":1174999,"endTime":1214999,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
+{"startTime":1174999,"endTime":3094999,"label":"TS1 ×3 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"3","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":3094999,"endTime":3254999,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":3334999,"endTime":3654999,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":3654999,"endTime":3814999,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":3814999,"endTime":3934999,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}},
+{"startTime":4018999,"endTime":4058999,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
+{"startTime":4018999,"endTime":4178999,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":4178999,"endTime":4338999,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
+{"startTime":4338999,"endTime":4358999,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}}
+]

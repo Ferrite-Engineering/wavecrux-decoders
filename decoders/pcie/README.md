@@ -136,7 +136,10 @@ On top of the PIPE and DLL output they add:
 **Timescale.** A Gen2 bit is 200 ps. Dump the line with a timescale of
 100 ps or finer (1 ps or 10 ps is usual for SerDes models); at 1 ns the bits
 cannot be placed. A run of one level longer than 8 ns is taken as electrical
-idle, not data.
+idle, not data. The level after the last transition in the dump is never
+decoded (its length is unknown), so a symbol right at the end of a dump that
+stops on a held level is lost. With a lot of jitter on a Gen1 line, set
+`rate` to `gen1`: `auto` reads a one-bit run shorter than 300 ps as Gen2.
 
 ## Limits
 

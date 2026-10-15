@@ -614,3 +614,52 @@ emitted before the symbol is fed, so it precedes what the symbol completes.
 - Flush (§10.6): runs still held by `rate=auto` are converted as Gen1
   first, then steps 1-4, then an electrical-idle period still open, then
   step 5.
+
+### 11.10 Readings settled by the first comparison
+
+The serial generator, the reference decoder and the C decoders were written
+from §11 independently and agreed on every fixture. These are the readings
+they had to take where §11 was silent; they are now part of it.
+
+1. **Disparity error names** (`Disparity error D12.3`, `symbol`) are the
+   8b/10b symbol as received, before descrambling: on a scrambled stream,
+   the scrambled byte. `code` in both error types is the ten bits after
+   `invert`, in wire order.
+2. **A COM found by locking or realigning is never disparity-checked**; its
+   form sets the running disparity. A COM that arrives on the boundary is
+   checked like any symbol (`Disparity error K28.5`).
+3. **After a disparity error** the RD is the one after s in the opposite-RD
+   encoding. A transmitter that keeps its own RD therefore shows a second
+   disparity error at its next RD-dependent symbol, not at the next symbol.
+4. **A slip**: the ten bits that complete a symbol before the realigning COM
+   are decoded normally (usually a code error, so EDB is fed), spanning their
+   own slot, which overlaps the COM. A realign is not a pipeline break: the
+   dropped bits are simply never fed, and line-level transactions do not end
+   coalesced runs.
+5. **Electrical idle is a gating break** (§4.3, §10.8 item 1): a stray run
+   ends, a SKP OS with at least one SKP is complete, any other ordered set in
+   progress is `unknown_os` with `symbol` its last symbol, spanning COM to
+   that symbol, and an open packet is `Packet truncated by electrical idle`.
+6. **Boundaries are strict**: a run of exactly 8 000 000 fs is bits; a run of
+   exactly 300 000 fs does not decide Gen2. The 40 runs of §11.4 count from
+   the burst's first run, before any lock.
+7. **"Some run converted to bits"** (§11.8) means any run of the trace
+   before the idle period, including bits before a lock and runs that
+   `rate=auto` still held (they are converted when the idle begins).
+8. **Idle spans**: one period runs from the start of the long run or the
+   first unknown sample to the first known sample that starts a run of bits.
+   An idle still open at the end spans to the last sample fed, which can
+   equal its start: a trace that ends on a single X shows a zero-length
+   `Electrical idle`, which is correct.
+9. **The first symbol of every burst is its lock COM**, so the `on`-mode
+   discard before the first COM (§5.2) never applies, and the descrambler
+   restarts at every burst.
+10. **The level after the last transition is never decoded** (§11.2): a
+    dump whose last symbol is not followed by a transition or X loses that
+    symbol.
+11. **`auto` rate and jitter**: rounding tolerates a run up to UI/2 short or
+    long, but a Gen1 one-bit run shortened by more than 100 ps falls under
+    300 ps and `auto` decides Gen2. On a jittery Gen1 line, set `rate=gen1`.
+12. **The `gen1`/`gen2` in a TS1/TS2 label** is the rate the TS advertises
+    (§7), not the rate of the line, so a Gen1 burst can show `Symbol lock
+    (Gen1, 2.5 GT/s)` beside `TS1 ... gen2`.

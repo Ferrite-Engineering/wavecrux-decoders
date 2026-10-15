@@ -295,7 +295,10 @@ disparities:
 **The comma.** `0011111` and `1100000` occur in valid 8b/10b only inside
 K28.1, K28.5 and K28.7 (and across a K28.7 followed by certain symbols), so
 a receiver aligns symbol boundaries on them. PCIe receivers align on COM
-(K28.5); its two forms are the first two rows above.
+(K28.5); its two forms are the first two rows above. The exception is real:
+K28.7 for RD- followed by D20.y forms the full COM pattern `1100000101`
+across the boundary, which would realign a receiver wrongly. PCIe never
+sends that pair (EIE is followed only by EIE or D10.2 in an EIEOS).
 
 **Polarity.** An inverted differential pair delivers every bit inverted.
 COM inverts into COM of the other disparity, so alignment still works, but

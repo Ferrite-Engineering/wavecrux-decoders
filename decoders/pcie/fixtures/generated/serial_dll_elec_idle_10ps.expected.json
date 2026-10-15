@@ -1,0 +1,8 @@
+[
+{"startTime":16580,"endTime":19780,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}},
+{"startTime":20580,"endTime":24980,"label":"Packet truncated by electrical idle","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"10","error":"The packet ended without END or EDB."}},
+{"startTime":28120,"endTime":31320,"label":"Ack seq=2","isError":false,"fields":{"type":"ack","seq":"2","crc":"0xF155"}},
+{"startTime":31320,"endTime":32920,"label":"Packet truncated by electrical idle","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"3","error":"The packet ended without END or EDB."}},
+{"startTime":37300,"endTime":38500,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0x3C","error":"COM was not followed by a recognised ordered set."}},
+{"startTime":48100,"endTime":51300,"label":"Ack seq=3","isError":false,"fields":{"type":"ack","seq":"3","crc":"0x504E"}}
+]

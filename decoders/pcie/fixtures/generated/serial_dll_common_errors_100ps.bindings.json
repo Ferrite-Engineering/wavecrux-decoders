@@ -1,0 +1,10 @@
+{
+  "decoder": "ferrite.pcie_serial_dll",
+  "signal_bindings": {
+    "line": "tb.dut.txp"
+  },
+  "parameters": {
+    "rate": "gen2",
+    "scrambling": "off"
+  }
+}

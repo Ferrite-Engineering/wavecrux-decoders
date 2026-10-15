@@ -1,0 +1,10 @@
+[
+{"startTime":813531,"endTime":973396,"label":"Vendor 0x123456","isError":false,"fields":{"type":"vendor","payload":"0x123456","crc":"0x6021"}},
+{"startTime":973395,"endTime":1133847,"label":"Vendor 0x00ABCD","isError":false,"fields":{"type":"vendor","payload":"0x00ABCD","crc":"0x154D"}},
+{"startTime":1133846,"endTime":1294914,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":1294913,"endTime":1453401,"label":"InitFC1-NP VC0 H=32 D=1","isError":false,"fields":{"type":"initfc1_np","vc":"0","hdr_fc":"32","data_fc":"1","crc":"0xB1F6"}},
+{"startTime":1453400,"endTime":1613670,"label":"InitFC1-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc1_cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xD892"}},
+{"startTime":1613669,"endTime":1774246,"label":"InitFC2-P VC1 H=255 D=4095","isError":false,"fields":{"type":"initfc2_p","vc":"1","hdr_fc":"255","data_fc":"4095","crc":"0xA47C"}},
+{"startTime":1793308,"endTime":2273001,"label":"TLP seq=0 MRd64 len=2","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd64","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0xDA564640","replay":"false"}},
+{"startTime":2273001,"endTime":2913160,"label":"TLP seq=1 MWr32 len=3","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MWr32","length_dw":"3","tc":"0","td":"false","ep":"false","bytes":"24","lcrc":"0x6708F5E6","replay":"false"}}
+]

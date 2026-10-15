@@ -1,0 +1,10 @@
+[
+{"startTime":3000,"endTime":6200,"label":"Ack seq=12","isError":false,"fields":{"type":"ack","seq":"12","crc":"0x3FD1"}},
+{"startTime":6200,"endTime":9400,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":9400,"endTime":12600,"label":"Ack seq=4095","isError":false,"fields":{"type":"ack","seq":"4095","crc":"0x25A8"}},
+{"startTime":12600,"endTime":15800,"label":"Nak seq=5","isError":false,"fields":{"type":"nak","seq":"5","crc":"0x7D70"}},
+{"startTime":15800,"endTime":19000,"label":"PM_Enter_L1","isError":false,"fields":{"type":"pm_enter_l1","crc":"0x65AD"}},
+{"startTime":19000,"endTime":22200,"label":"PM_Enter_L23","isError":false,"fields":{"type":"pm_enter_l23","crc":"0x1055"}},
+{"startTime":22200,"endTime":35000,"label":"TLP seq=0 MWr64 len=2","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr64","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"24","lcrc":"0xBFB01F30","replay":"false"}},
+{"startTime":35000,"endTime":43000,"label":"TLP seq=1 CfgRd0 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"CfgRd0","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x55874F14","replay":"false"}}
+]

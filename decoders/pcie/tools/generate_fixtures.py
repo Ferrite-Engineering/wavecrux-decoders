@@ -960,9 +960,457 @@ def _(st: Stream) -> None:
     st.pad_idle()
 
 
+# ── serial line decoders (SPEC §11) ──────────────────────────────────────────
+
+@dataclass
+class SerialFixture:
+    name: str
+    proves: str
+    decoder: str
+    build: object
+    timescale: tuple
+    params: dict
+    scrambled: bool
+    names: L.SerialNames
+
+
+def serial(name: str, proves: str, kind: str, timescale: tuple, params: dict | None = None,
+           scrambled: bool = False, names: L.SerialNames | None = None):
+    def wrap(fn):
+        FIXTURES.append(SerialFixture(name, proves, f"ferrite.pcie_{kind}", fn, timescale, params or {},
+                                      scrambled, names or L.SerialNames()))
+        return fn
+    return wrap
+
+
+NS = 1_000_000          # fs
+PRE = ("data", bytes([0x00, 0x00, 0x00]), 3)     # the tail of logical idle sent before the receiver locks
+BAD = "0011111011"      # SPEC §11.8's example: K28 6b with the wrong 4b form (a comma, but not a COM)
+BAD2 = "1110000011"
+BAD3 = "0000011110"
+
+
+def serial_training(st: L.SerialStream) -> None:
+    st.ts("ts1", None, None, n_fts=24, count=4)
+    st.ts("ts1", 0, None, count=2)
+    st.ts("ts2", 0, 0, count=4)
+    st.skp()
+    st.fts(2)
+    st.skp()
+
+
+# Gen1 at a fixed rate: X before the line is active shows nothing; pre-lock bits are ignored; lock on the first COM (RD-); TS/SKP/FTS/packets at 400 ps per bit; the last symbol is decoded because a transition follows it; redundant value writes do not end a run.
+@serial("serial_gen1_training_1ps", "Gen1 lock (RD- COM), pre-lock bits ignored, TS/SKP/FTS/EIOS and frames at UI 400 ps, redundant samples",
+        "serial", (1, "ps"), params={"rate": "gen1", "scrambling": "off"},
+        names=L.SerialNames(complement="txn", redundant=True))
+def _(st: L.SerialStream) -> None:
+    st.lead(("x", 2 * NS))
+    st.burst("gen1", rd=-1, prelock=[PRE, ("bits", "01")])
+    serial_training(st)
+    st.idle(4)
+    st.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    st.idle(2)
+    st.tlp(Tlp("MRd32", 0, rng_seed=3))
+    st.idle(3)
+    st.skp(2)
+    st.eios()
+
+
+# Gen2 at a fixed rate, scrambled, scrambling=on with show_idle: lock on an RD+ COM (1100000101), EIEOS (K28.7 runs carry commas but no COM), descrambled idle runs and packets at 200 ps per bit.
+@serial("serial_gen2_scrambled_10ps", "Gen2 lock on an RD+ COM, EIEOS, scrambling=on, show_idle, frames at UI 200 ps",
+        "serial", (10, "ps"), params={"rate": "gen2", "scrambling": "on", "show_idle": True}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=1, prelock=[("data", bytes([0x00, 0x00]), 6)])
+    st.eieos(2)
+    st.ts("ts1", 0, 0, rate=0x06, count=2)
+    st.ts("ts2", 0, 0, rate=0x06, count=2)
+    st.idle(6)
+    st.dllp(Dllp("ack", seq=3))
+    st.idle(3)
+    st.tlp(Tlp("MWr32", 0, length_dw=2, rng_seed=21))
+    st.idle(4)
+    st.skp()
+    st.idle(2)
+    st.eios()
+
+
+# rate=auto: a Gen2 burst decided by a 299.9 ps run after a run of exactly 300 ps (not shorter, so not deciding); a Gen1 burst decided after 40 runs; a short Gen1 burst (< 40 runs, the first a run of exactly 8 ns, which is bits, not idle) decided when X/Z idle ends it; the open idle at the end spans to the last sample.
+@serial("serial_rate_auto_100fs", "rate=auto: Gen2 on a run < 300 ps (300 ps exactly does not decide), Gen1 at 40 runs, Gen1 when the burst ends first; 8 ns run is bits",
+        "serial", (100, "fs"), params={"rate": "auto", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=-1, prelock=[("run", "1", 5, 1_000_000), ("run", "0", 2, 300_000),
+                                     ("run", "1", 3, 500_000), ("run", "0", 1, 299_900), ("bits", "1"), PRE], decide=1)
+    st.ts("ts1", 0, 0, rate=0x86, count=2)
+    st.skp()
+    st.dllp(Dllp("ack", seq=1))
+    st.eios()
+    st.elec_idle(("x", 3 * NS))
+    st.burst("gen1", rd=-1, prelock=[PRE], decide=2)
+    st.ts("ts1", 0, 0, count=3)
+    st.skp()
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=2))
+    st.eios()
+    st.elec_idle(("~", 12 * NS))
+    st.burst("gen1", rd=-1, prelock=[("run", "~", 20, 8 * NS), ("bits", "1")], decide=3)
+    st.skp()
+    st.eios()
+    st.elec_idle(("x", 2 * NS), ("z", 1 * NS))
+
+
+# rate=auto on the DLL decoder, scrambled, scrambling=auto: Gen1 burst (40 runs), X idle, Gen2 burst with EIEOS, level idle, then a short Gen1 burst still held at the end of the trace (flush converts it as Gen1): a code error there is EDB without start.
+@serial("serial_dll_rate_auto_1ps", "rate=auto per burst on the DLL decoder; runs still held at flush are converted as Gen1; auto scrambling locks on",
+        "serial_dll", (1, "ps"), params={"rate": "auto"}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE], decide=2)
+    st.skp()
+    st.ts("ts1", 0, 0, rate=0x06, count=2)
+    st.idle(3)
+    st.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    st.tlp(Tlp("MRd32", 0, rng_seed=41))
+    st.idle(2)
+    st.eios()
+    st.elec_idle(("x", 4 * NS))
+    st.burst("gen2", rd=1, prelock=[("data", bytes([0x00]), 2)], decide=1)
+    st.eieos(1)
+    st.ts("ts1", 0, 0, rate=0x86, count=2)
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=0))
+    st.tlp(Tlp("MWr32", 1, rng_seed=42))
+    st.eios()
+    st.elec_idle(("~", 9 * NS))
+    st.burst("gen1", rd=-1, prelock=[("bits", "1010")], decide=3)
+    st.skp()
+    st.unmatched_end(EDB)
+    st.code_error(st.pos() - 1, BAD)
+
+
+# 8b/10b faults through the symbol decoder: wrong-RD D0.0 with the transmitter resynced (one error) and not (a second error on the next D0.0), a wrong-RD COM on the boundary (Disparity error K28.5), a wrong-RD DLLP byte (DLLP still good), code errors in idle, as a DLLP's END, inside a DLLP body (EDB ends it, the rest is stray data and END without start), as a TLP's END and after SKP SKP; K28.4 is an invalid K symbol.
+@serial("serial_8b10b_errors_1ps", "disparity errors (RD rule after them), code errors fed as EDB in idle/DLLP/TLP/SKP OS, K28.4 invalid",
+        "serial", (1, "ps"), params={"rate": "gen1", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.ts("ts1", 0, 0, count=2)
+    st.idle(3)
+    st.wrong_rd(st.pos())                 # resync: the receiver's RD rule leaves no second error
+    st.idle(4)
+    st.wrong_rd(st.pos(), resync=False)   # the transmitter keeps its RD: the next D0.0 is flagged too
+    st.idle(4)
+    st.wrong_rd(st.pos())                 # the COM of a SKP OS, on the boundary
+    st.skp()
+    st.idle(2)
+    a = st.pos()
+    st.dllp(Dllp("ack", seq=5))
+    st.wrong_rd(a + 1, a + 6)
+    st.idle(2)
+    st.unmatched_end(EDB)
+    st.code_error(st.pos() - 1, BAD)
+    st.idle(2)
+    u = st.dllp(Dllp("ack", seq=6), end=EDB)
+    st.code_error(u.b, BAD2)
+    st.idle(1)
+    st.dllp_cut(Dllp("nak", seq=7), 2, BAD3)
+    st.idle(2)
+    u = st.tlp(Tlp("MWr32", 1, rng_seed=51), end=EDB)
+    st.code_error(u.b, BAD)
+    st.idle(2)
+    st.skp(2)
+    st.unmatched_end(EDB)
+    st.code_error(st.pos() - 1, BAD2)
+    st.idle(2)
+    st.invalid_k(0x9C)
+    st.idle(2)
+    st.eios()
+
+
+# The same faults through the DLL decoder at Gen2 on a scrambled stream (scrambling=on): wrong-RD bytes inside a DLLP and a TLP (both still decode; the label names the 8b/10b symbol on the wire), a TLP's END as a code error (tlp_edb), a TLP cut by a code error at a valid framing length (tlp_edb, then stray data and END without start), a DLLP's END as a code error (dllp_edb).
+@serial("serial_dll_8b10b_errors_10ps", "DLL decoder: disparity errors on scrambled bytes, code errors ending TLPs and DLLPs (tlp_edb, dllp_edb)",
+        "serial_dll", (10, "ps"), params={"rate": "gen2", "scrambling": "on"}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=1, prelock=[PRE])
+    st.skp()
+    st.ts("ts1", 0, 0, rate=0x06, count=2)
+    st.idle(4)
+    a = st.pos()
+    st.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    st.wrong_rd(a + 1, a + 6)
+    a = st.pos()
+    st.tlp(Tlp("MWr32", 0, length_dw=2, rng_seed=61))
+    st.wrong_rd(a + 8, a + 20, resync=False)
+    st.idle(2)
+    u = st.tlp(Tlp("MRd32", 1, rng_seed=62), end=EDB)
+    st.code_error(u.b, BAD)
+    st.idle(1)
+    st.tlp_cut(Tlp("MWr32", 2, length_dw=4, rng_seed=63), 22, BAD2)
+    st.idle(2)
+    u = st.dllp(Dllp("ack", seq=0), end=EDB)
+    st.code_error(u.b, BAD3)
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=0))
+    st.tlp(Tlp("MRd32", 1, rng_seed=64))
+    st.skp()
+
+
+# Bit slips while locked: 3 bits inserted before a COM (realign by 3, the misaligned symbol a code error overlapping the COM), 9 bits of an idle symbol deleted (by 1 bit), 9 bits inserted before a COM sent with the other RD (by 9; its form sets the RD, so no disparity error), 6 bits inserted (by 6), a DLLP's END cut to 2 bits (by 2; EDB ends the DLLP).
+@serial("serial_slip_realign_10ps", "realign by 1, 2, 3, 6 and 9 bits; the overlapping code error; EDB ends a DLLP; a realign COM's form sets the RD",
+        "serial", (10, "ps"), params={"rate": "gen1", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.ts("ts1", 0, 0, count=2)
+    st.idle(4)
+    st.slip("111")
+    st.skp()
+    st.idle(3)
+    st.dllp(Dllp("ack", seq=1))
+    st.idle(2)
+    st.slip(trunc=(0x00, False, 1))
+    st.skp()
+    st.idle(2)
+    st.slip("111100001")
+    st.wrong_rd(st.pos())
+    st.skp()
+    st.idle(2)
+    st.slip("000011")
+    st.skp()
+    st.idle(2)
+    u = st.dllp(Dllp("ack", seq=2), end=EDB)
+    st.garbage(u.b, trunc=(END, True, 2))
+    st.skp()
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=3))
+    st.idle(2)
+    st.eios()
+
+
+# Slips on the DLL decoder at Gen2, scrambled, scrambling=auto: realign by 5 in idle, by 7 and 8 right after a TLP, a TLP's END cut to 4 bits (tlp_edb, realign by 4); the descrambler resyncs at the COM and later packets are good.
+@serial("serial_dll_slip_100fs", "DLL decoder: realign by 4, 5, 7 and 8 on a scrambled Gen2 stream; auto scrambling locks on",
+        "serial_dll", (100, "fs"), params={"rate": "gen2"}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=-1, prelock=[PRE])
+    st.skp()
+    st.ts("ts1", 0, 0, rate=0x06, count=2)
+    st.idle(3)
+    st.dllp(Dllp("ack", seq=0))
+    st.idle(2)
+    st.slip("10110")
+    st.skp()
+    st.idle(2)
+    st.tlp(Tlp("MWr32", 0, rng_seed=71))
+    st.slip("1111001")
+    st.skp()
+    st.slip("00001111")
+    st.skp()
+    st.idle(2)
+    u = st.tlp(Tlp("MRd32", 1, rng_seed=72), end=EDB)
+    st.garbage(u.b, trunc=(END, True, 4))
+    st.skp()
+    st.idle(1)
+    st.tlp(Tlp("MRd32", 1, rng_seed=73))
+    st.dllp(Dllp("ack", seq=1))
+    st.skp()
+
+
+def elec_idle_body(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.ts("ts1", 0, 0, count=2)
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=1))
+    st.idle(2)
+    body = bytes([0x00, 0x09]) + Tlp("MWr32", 9, length_dw=2, rng_seed=81).bytes()
+    st.truncated("tlp", body[:10], by="electrical idle")
+    st.elec_idle(("x", 5 * NS))                                    # X: the TLP is truncated
+    st.burst("gen1", rd=1, prelock=[("data", bytes([0x00]), 4)])   # relock on the other COM form
+    st.skp()
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=2))
+    st.truncated("dllp", bytes([0x00, 0x00, 0x00]), by="electrical idle")
+    st.elec_idle(("~", 9 * NS), ("x", 2 * NS), partial="10110")    # long run then X: one period; 5 bits dropped
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.idle(1)
+    st.os_cut([(FTS, True), (FTS, True)])                         # COM FTS FTS, cut: unknown_os
+    st.elec_idle(("z", 3 * NS), ("1", 10 * NS))                    # Z then a long run: one period
+    st.burst("gen1", rd=-1, prelock=[("bits", "0"), PRE])
+    st.skp()
+    st.idle(1)
+    st.skp(2)                                                     # a SKP OS with 2 SKPs is complete at idle
+    st.elec_idle(("x", 1 * NS))
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.idle(3)
+    st.dllp(Dllp("ack", seq=3))
+    st.eios()
+
+
+# Electrical idle on the symbol decoder: a long level first (not reported: nothing converted yet), X idle truncating a TLP, a long run then X (one period, partial symbol dropped, DLLP truncated), Z then a long run (one period, COM FTS FTS cut is unknown_os), X after a 2-SKP SKP OS (complete), X then Z at the end (open period spans to the last sample); every burst relocks, once on an RD+ COM.
+@serial("serial_elec_idle_1ps", "electrical idle as X, Z and > 8 ns levels, back to back; truncation and cut ordered sets; relock; open idle at the end",
+        "serial", (1, "ps"), params={"rate": "gen1", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.lead(("0", 12 * NS))
+    elec_idle_body(st)
+    st.elec_idle(("x", 2 * NS), ("z", 1 * NS))
+
+
+# The same idle and truncation pattern through the DLL decoder (no electrical_idle or lock transactions), starting at X, ending with a plain transition.
+@serial("serial_dll_elec_idle_10ps", "DLL decoder: packets truncated by electrical idle; no lock or idle transactions",
+        "serial_dll", (10, "ps"), params={"rate": "gen1", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.lead(("x", 3 * NS))
+    elec_idle_body(st)
+
+
+# invert=true on an inverted line (RXN bound, or a swapped pair) at Gen2, scrambled, default scrambling=auto locking on at the first DLLP; an unbound TXN carries the true polarity.
+@serial("serial_invert_gen2_1ps", "invert=true undoes an inverted line (Gen2, scrambled, scrambling=auto)",
+        "serial", (1, "ps"), params={"rate": "gen2", "invert": True}, scrambled=True,
+        names=L.SerialNames(complement="txn"))
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=-1, prelock=[PRE])
+    st.eieos(1)
+    st.ts("ts1", 0, 0, rate=0x06, count=2)
+    st.ts("ts2", 0, 0, rate=0x06, count=2)
+    st.idle(4)
+    st.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    st.tlp(Tlp("CplD", 0, length_dw=1, rng_seed=91))
+    st.idle(2)
+    st.skp()
+    st.eios()
+
+
+# invert=true on the DLL decoder at Gen1, unscrambled.
+@serial("serial_dll_invert_10ps", "invert=true on the DLL decoder (Gen1, unscrambled)",
+        "serial_dll", (10, "ps"), params={"rate": "gen1", "invert": True, "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=1, prelock=[("data", bytes([0x00, 0x00]), 5)])
+    st.skp()
+    st.idle(2)
+    for d in ALL_DLLPS[:6]:
+        st.dllp(d)
+    st.tlp(Tlp("MWr64", 0, length_dw=2, rng_seed=92))
+    st.tlp(Tlp("CfgRd0", 1, rng_seed=93))
+    st.idle(2)
+    st.eios()
+
+
+# Gen1 with every edge displaced by up to UI/2 - 1 fs (1 fs ticks), neighbours never more than UI/2 apart: run lengths round to whole bits (both rounding limits hit) and bit times use the floor formula; coalesce=false.
+@serial("serial_jitter_gen1_1fs", "jitter up to UI/2 - 1 fs: bit counts by rounding, bit times by floor(i*D/n); coalesce=false",
+        "serial", (1, "fs"), params={"rate": "gen1", "scrambling": "off", "coalesce": False})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE], jitter=7)
+    st.skp()
+    st.ts("ts1", 0, 0, count=2)
+    st.fts(2)
+    st.idle(3)
+    st.dllp(Dllp("ack", seq=4))
+    st.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=94))
+    st.idle(2)
+    st.skp(4)
+    st.eios()
+
+
+# Gen2 jitter (edges moved by up to UI/2 - 100 fs) on the DLL decoder with rate=auto (every 1-bit run stays under 300 ps, every longer run at or above it), scrambled, scrambling=on.
+@serial("serial_dll_jitter_gen2_100fs", "DLL decoder: Gen2 jitter under rate=auto, scrambled",
+        "serial_dll", (100, "fs"), params={"rate": "auto", "scrambling": "on"}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=1, prelock=[PRE], jitter=11, decide=1)
+    st.skp()
+    st.ts("ts1", 0, 0, rate=0x06, count=2)
+    st.idle(2)
+    for d in ALL_DLLPS[8:14]:
+        st.dllp(d)
+    st.idle(1)
+    st.tlp(Tlp("MRd64", 0, length_dw=2, rng_seed=95))
+    st.tlp(Tlp("MWr32", 1, length_dw=3, rng_seed=96))
+    st.skp()
+
+
+def speed_change(st: L.SerialStream, level_idle: bool) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE], decide=2)
+    st.ts("ts1", 0, 0, rate=0x06, count=3)
+    st.ts("ts2", 0, 0, rate=0x06, count=2)
+    st.skp()
+    st.idle(4)
+    st.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    st.idle(2)
+    st.tlp(Tlp("MWr32", 0, rng_seed=101))
+    st.idle(2)
+    st.ts("ts1", 0, 0, rate=0x86, count=2)       # Recovery: speed_change set
+    st.ts("ts2", 0, 0, rate=0x86, count=2)
+    st.eios()
+    if level_idle:
+        st.elec_idle(("~", 10 * NS))
+    else:
+        st.elec_idle(("x", 6 * NS))
+    st.burst("gen2", rd=1, prelock=[("data", bytes([0x00]), 1)], decide=1)
+    st.eieos(1)
+    st.ts("ts1", 0, 0, rate=0x86, count=2)
+    st.eieos(1)
+    st.ts("ts2", 0, 0, rate=0x06, count=2)
+    st.skp()
+    st.idle(3)
+    st.dllp(Dllp("ack", seq=0))
+    st.tlp(Tlp("MRd32", 1, rng_seed=102))
+    st.idle(2)
+    st.dllp(Dllp("ack", seq=1))
+    st.eios()
+
+
+# Gen1 -> Gen2 speed change on the symbol decoder: training and packets at Gen1, EIOS, X idle, then EIEOS + TS at Gen2 and packets; rate=auto decides each burst, second lock at Gen2; scrambled, scrambling=auto locks on at Gen1 and stays.
+@serial("serial_speed_change_1ps", "Gen1 -> electrical idle -> Gen2 with a second lock; rate=auto and scrambling=auto",
+        "serial", (1, "ps"), params={"rate": "auto"}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    speed_change(st, level_idle=False)
+
+
+# The same speed change through the DLL decoder, with the idle as a held level.
+@serial("serial_dll_speed_change_10ps", "DLL decoder: Gen1 -> held-level idle -> Gen2; packets on both sides",
+        "serial_dll", (10, "ps"), params={"rate": "auto"}, scrambled=True)
+def _(st: L.SerialStream) -> None:
+    speed_change(st, level_idle=True)
+
+
+# The SPEC §6 common errors through the serial DLL decoder at Gen2 on a 100 ps timescale (2 ticks per bit, the coarsest that holds Gen2 bits).
+@serial("serial_dll_common_errors_100ps", "SPEC §6 common errors via the serial DLL decoder; Gen2 on 100 ps ticks",
+        "serial_dll", (100, "ps"), params={"rate": "gen2", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen2", rd=-1, prelock=[PRE])
+    common_errors(st)
+
+
+# The §10.2 framing errors through the serial symbol decoder, ending with a packet still open at the end of the trace.
+@serial("serial_frame_errors_10ps", "§10.2 framing errors via the serial symbol decoder; packet open at end of trace",
+        "serial", (10, "ps"), params={"rate": "gen1", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    frame_errors(st)
+
+
 # ── generation ───────────────────────────────────────────────────────────────
 
+def make_serial(fx: SerialFixture) -> dict[str, str]:
+    st = L.SerialStream(scrambled=fx.scrambled)
+    fx.build(st)
+    st.finish()
+    fpt = L.fs_per_tick(*fx.timescale)
+    line = L.transmit(st, fpt)
+    invert = fx.params.get("invert", False)
+    text, path = L.write_serial_vcd(line, fx.timescale, invert, fx.names)
+    # The host model must see exactly the changes the transmitter laid out.
+    samples = L.host_line_samples(text, fpt)
+    dedup = [s for k, s in enumerate(samples) if k == 0 or s[1] != samples[k - 1][1]]
+    vcd_v = [(t, L._flip(v) if invert and v in "01" else v) for t, v in line.changes]
+    assert dedup == vcd_v, f"{fx.name}: host samples differ from the transmitted changes"
+    txs = L.expected_serial(st, line, samples, fx.decoder, fx.params)
+    return {f"{fx.name}.vcd": text,
+            f"{fx.name}.bindings.json": L.bindings_json(fx.decoder, {"line": path}, fx.params),
+            f"{fx.name}.expected.json": L.canonical(txs, fpt)}
+
+
 def make(fx: Fixture) -> dict[str, str]:
+    if isinstance(fx, SerialFixture):
+        return make_serial(fx)
     st = Stream(fx.lanes, scrambled=fx.scrambled)
     fx.build(st)
     st.finish()

@@ -1,0 +1,12 @@
+[
+{"startTime":10633411,"endTime":14938519,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
+{"startTime":10633411,"endTime":26913891,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
+{"startTime":26913891,"endTime":90719208,"label":"TS1 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":90719208,"endTime":154721874,"label":"TS1 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":154721874,"endTime":170614640,"label":"FTS","isError":false,"fields":{"type":"fts","count":"1"}},
+{"startTime":170614640,"endTime":186664085,"label":"FTS","isError":false,"fields":{"type":"fts","count":"1"}},
+{"startTime":198897978,"endTime":230999999,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":230999999,"endTime":326943141,"label":"TLP frame seq=0 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"22","end":"END"}},
+{"startTime":334749173,"endTime":354959906,"label":"SKP ×4","isError":false,"fields":{"type":"skp","skp_symbols":"4"}},
+{"startTime":354959906,"endTime":370800000,"label":"EIOS","isError":false,"fields":{"type":"eios"}}
+]

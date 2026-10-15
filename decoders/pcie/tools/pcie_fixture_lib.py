@@ -173,6 +173,7 @@ def self_check() -> list[str]:
         if lcrc_wire(bytes(buf)) != zlib.crc32(bytes(buf)).to_bytes(4, "little"):
             bad += 1
     check(bad == 0, f"bit-serial LCRC == zlib over 200 pseudo-random inputs ({bad} mismatches)")
+    self_check_8b10b(check)
     if fails:
         raise SystemExit("protocol self-check FAILED:\n" + "\n".join(fails + lines))
     return lines
@@ -1420,6 +1421,12 @@ def expected(st: Stream, edges: list[Edge], decoder: str, params: dict,
             txs += rxstatus_txs(tm)
         return txs
 
+    return select_scrambling(st, tm, mode, run)
+
+
+def select_scrambling(st: Stream, tm: object, mode: str, run) -> list[Tx]:
+    """SPEC §5.5 / §10.3 / §10.5: `run(view)` gives one pipeline's
+    transactions; in `auto` the winner's, plus the lock notice."""
     if mode in ("off", "on"):
         return run(mode)
     # auto
@@ -1503,3 +1510,775 @@ def bindings_json(decoder: str, paths: dict, params: dict) -> str:
     if params:
         obj["parameters"] = params
     return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
+
+
+# ── 6. The serial line (SPEC §11, protocol-notes §9) ─────────────────────────
+#
+# Encoder direction again: a finished Stream (1 lane) is 8b/10b ENCODED with
+# running disparity into line bits, laid out on a time axis at the burst's
+# unit interval, and written as a 1-bit VCD. The expected transactions come
+# from what the transmitter meant to put on the line (which symbol, which RD
+# form, which deliberate fault) and from the SPEC's rules. The only rule
+# applied to the generated waveform itself is SPEC §11.2-§11.5 (runs, idle,
+# rate, bit times), which the SPEC defines on change times, and the result is
+# asserted to give back exactly the bits the transmitter laid out.
+
+# protocol-notes §9, 5b/6b: x -> (RD- form, RD+ form); one entry = both.
+D6 = {
+    0: ("100111", "011000"), 1: ("011101", "100010"), 2: ("101101", "010010"), 3: ("110001",),
+    4: ("110101", "001010"), 5: ("101001",), 6: ("011001",), 7: ("111000", "000111"),
+    8: ("111001", "000110"), 9: ("100101",), 10: ("010101",), 11: ("110100",),
+    12: ("001101",), 13: ("101100",), 14: ("011100",), 15: ("010111", "101000"),
+    16: ("011011", "100100"), 17: ("100011",), 18: ("010011",), 19: ("110010",),
+    20: ("001011",), 21: ("101010",), 22: ("011010",), 23: ("111010", "000101"),
+    24: ("110011", "001100"), 25: ("100110",), 26: ("010110",), 27: ("110110", "001001"),
+    28: ("001110",), 29: ("101110", "010001"), 30: ("011110", "100001"), 31: ("101011", "010100"),
+}
+K28_6 = ("001111", "110000")
+# 3b/4b, by the RD after the 6-bit sub-block.
+D4 = {0: ("1011", "0100"), 1: ("1001",), 2: ("0101",), 3: ("1100", "0011"),
+      4: ("1101", "0010"), 5: ("1010",), 6: ("0110",), 7: ("1110", "0001")}
+D4_ALT7 = ("0111", "1000")
+K4 = {0: ("1011", "0100"), 1: ("0110", "1001"), 2: ("1010", "0101"), 3: ("1100", "0011"),
+      4: ("1101", "0010"), 5: ("0101", "1010"), 6: ("1001", "0110"), 7: ("0111", "1000")}
+# K28.0-K28.7, K23.7, K27.7, K29.7, K30.7 (byte = y << 5 | x).
+K_SYMBOLS = (0x1C, 0x3C, 0x5C, 0x7C, 0x9C, 0xBC, 0xDC, 0xFC, 0xF7, 0xFB, 0xFD, 0xFE)
+COM_MINUS, COM_PLUS = "0011111010", "1100000101"
+
+
+def _rd_after(bits: str, rd: int) -> int:
+    """More ones than zeros: RD+; more zeros: RD-; balanced: unchanged."""
+    ones = bits.count("1")
+    if 2 * ones > len(bits):
+        return 1
+    if 2 * ones < len(bits):
+        return -1
+    return rd
+
+
+def enc8b10b(byte: int, k: bool, rd: int) -> tuple[str, int]:
+    """(ten bits in wire order a b c d e i f g h j, RD after) for the symbol
+    encoded at running disparity `rd` (-1 or +1)."""
+    x, y = byte & 0x1F, byte >> 5
+    if k:
+        assert byte in K_SYMBOLS, hex(byte)
+        six = K28_6 if x == 28 else D6[x]
+    else:
+        six = D6[x]
+    s6 = six[0] if rd < 0 or len(six) == 1 else six[1]
+    rd1 = _rd_after(s6, rd)
+    if k:
+        four = K4[y]
+    elif y == 7 and ((rd1 < 0 and x in (17, 18, 20)) or (rd1 > 0 and x in (11, 13, 14))):
+        four = D4_ALT7
+    else:
+        four = D4[y]
+    s4 = four[0] if rd1 < 0 or len(four) == 1 else four[1]
+    return s6 + s4, _rd_after(s4, rd1)
+
+
+def sym_name(byte: int, k: bool) -> str:
+    return f"{'K' if k else 'D'}{byte & 0x1F}.{byte >> 5}"
+
+
+def _all_codes() -> dict[str, set]:
+    codes: dict[str, set] = {}
+    for rd in (-1, 1):
+        for b in range(256):
+            codes.setdefault(enc8b10b(b, False, rd)[0], set()).add((b, False))
+        for b in K_SYMBOLS:
+            codes.setdefault(enc8b10b(b, True, rd)[0], set()).add((b, True))
+    return codes
+
+
+ALL_CODES = _all_codes()
+
+# protocol-notes §9 known answers: (name, byte, k, RD- code, RD after, RD+ code, RD after).
+KAT_8B10B = [
+    ("K28.5 COM", 0xBC, True, "0011111010", 1, "1100000101", -1),
+    ("K28.0 SKP", 0x1C, True, "0011110100", -1, "1100001011", 1),
+    ("K28.1 FTS", 0x3C, True, "0011111001", 1, "1100000110", -1),
+    ("K28.2 SDP", 0x5C, True, "0011110101", 1, "1100001010", -1),
+    ("K28.3 IDL", 0x7C, True, "0011110011", 1, "1100001100", -1),
+    ("K28.7 EIE", 0xFC, True, "0011111000", -1, "1100000111", 1),
+    ("K23.7 PAD", 0xF7, True, "1110101000", -1, "0001010111", 1),
+    ("K27.7 STP", 0xFB, True, "1101101000", -1, "0010010111", 1),
+    ("K29.7 END", 0xFD, True, "1011101000", -1, "0100010111", 1),
+    ("K30.7 EDB", 0xFE, True, "0111101000", -1, "1000010111", 1),
+    ("D0.0", 0x00, False, "1001110100", -1, "0110001011", 1),
+    ("D10.2 TS1 id", 0x4A, False, "0101010101", -1, "0101010101", 1),
+    ("D5.2 TS2 id", 0x45, False, "1010010101", -1, "1010010101", 1),
+    ("D21.5", 0xB5, False, "1010101010", -1, "1010101010", 1),
+    ("D7.7", 0xE7, False, "1110001110", 1, "0001110001", -1),
+    ("D17.7", 0xF1, False, "1000110111", 1, "1000110001", -1),
+    ("D11.7", 0xEB, False, "1101001110", 1, "1101001000", -1),
+]
+
+
+def self_check_8b10b(check) -> None:
+    for name, b, k, cm, am, cp, ap in KAT_8B10B:
+        got = enc8b10b(b, k, -1)
+        check(got == (cm, am), f"8b/10b {name} RD- -> {got[0]} {'+' if got[1] > 0 else '-'} (want {cm})")
+        got = enc8b10b(b, k, 1)
+        check(got == (cp, ap), f"8b/10b {name} RD+ -> {got[0]} {'+' if got[1] > 0 else '-'} (want {cp})")
+    multi = sorted(c for c, s in ALL_CODES.items() if len(s) > 1)
+    check(not multi, f"8b/10b: {len(ALL_CODES)} distinct codes over both RD tables, none maps to two symbols {multi[:3]}")
+    bad_disp = [c for c in ALL_CODES if abs(2 * c.count("1") - 10) not in (0, 2)]
+    check(not bad_disp, "8b/10b: every code has disparity 0 or +-2")
+    commas = sorted(sym_name(*next(iter(s))) for c, s in ALL_CODES.items()
+                    if "0011111" in c or "1100000" in c)
+    check(set(commas) == {"K28.1", "K28.5", "K28.7"},
+          f"8b/10b: the comma occurs inside K28.1, K28.5, K28.7 only ({sorted(set(commas))})")
+
+
+UI_FS = {"gen1": 400_000, "gen2": 200_000}
+RATE_TEXT = {"gen1": "Gen1, 2.5 GT/s", "gen2": "Gen2, 5.0 GT/s"}
+IDLE_RUN_FS = 8_000_000
+GEN2_RUN_FS = 300_000
+RATE_RUNS = 40
+
+LINE_ERROR_TEXT = {
+    "realign": "A COM arrived off the symbol boundary; symbol alignment moved to it.",
+    "code_error": "Not a valid 8b/10b code group.",
+    "disparity_error": "The code group is valid only for the other running disparity.",
+}
+
+
+@dataclass
+class BurstPlan:
+    rate: str            # the rate the transmitter sends this burst at
+    rd: int              # transmitter RD at the burst's first bit
+    prelock: list        # pieces before the first symbol (see SerialStream.burst)
+    jitter: int | None   # PRNG seed for edge displacement, or None
+    decide: int | None   # with rate=auto: the SPEC §11.4 rule that must decide it
+
+
+class SerialStream(Stream):
+    """A 1-lane Stream plus the line plan: bursts, electrical idle, and the
+    faults the line adds (code errors, wrong-RD encodings, bit slips).
+
+    The symbols are still the PIPE-side intent: what the receiver feeds its
+    pipeline. A code error is an EDB symbol (what the receiver substitutes)
+    that the transmitter replaces on the line by an invalid code group."""
+
+    def __init__(self, scrambled: bool = False) -> None:
+        super().__init__(1, scrambled)
+        self.lead_pieces: list = []
+        self.line_ev: dict[int, list] = {}
+        self.marks: dict[int, tuple] = {}
+        self.wrong_ranges: list[list] = []
+        self.cuts: list[int] = []
+
+    def _ev(self, ev: tuple) -> None:
+        self.line_ev.setdefault(len(self.syms), []).append(ev)
+
+    # the line plan
+    def lead(self, *pieces: tuple) -> None:
+        """What the line does before the first burst: ("x"|"z", fs) or a
+        level held longer than 8 ns ("0"|"1", fs)."""
+        assert not self.syms and not self.line_ev
+        self.lead_pieces = list(pieces)
+
+    def burst(self, rate: str, rd: int = -1, prelock: tuple = (), jitter: int | None = None,
+              decide: int | None = None) -> None:
+        """Start a burst. `prelock` pieces come before the first symbol (which
+        must be a COM): ("bits", "0110"), ("data", bytes, skip) = those D
+        symbols encoded from `rd` minus their first `skip` bits, or
+        ("run", level|"~", nbits, fs) = one run of an exact duration.
+        `decide` asserts which SPEC §11.4 rule (1, 2 or 3) decides the rate
+        when the fixture runs with rate=auto."""
+        self._ev(("burst", BurstPlan(rate, rd, list(prelock), jitter, decide)))
+
+    def elec_idle(self, *pieces: tuple, partial: str = "") -> None:
+        """Electrical idle: ("x"|"z", fs) or ("0"|"1"|"~", fs > 8 ns), where
+        "~" is the level opposite the line's previous one. `partial` bits are
+        sent first and form an incomplete symbol the receiver drops."""
+        self._ev(("idle", list(pieces), partial))
+
+    # faults
+    def wrong_rd(self, a: int, b: int | None = None, resync: bool = True) -> None:
+        """Encode the first symbol in a..b whose code depends on the RD with
+        the opposite RD. resync: the transmitter then continues from the RD
+        that encoding leaves (the receiver's); otherwise from its own."""
+        self.wrong_ranges.append([a, a if b is None else b, resync, None])
+
+    def code_error(self, idx: int, bits: str) -> None:
+        s = self.syms[idx]
+        assert s.k and s.byte == EDB, "a code error is fed as EDB"
+        assert len(bits) == 10 and bits not in ALL_CODES, bits
+        self.marks[idx] = ("code", bits)
+
+    def garbage(self, idx: int, bits: str | None = None, trunc: tuple | None = None) -> None:
+        """Bit slip: 1-9 bits in place of symbol `idx` (an EDB), right before
+        a COM. Either explicit `bits` (inserted bits) or trunc=(byte, k, L):
+        the first L bits of that symbol's code (the rest deleted)."""
+        s = self.syms[idx]
+        assert s.k and s.byte == EDB
+        self.marks[idx] = ("garbage", bits, trunc)
+
+    def slip(self, bits: str | None = None, trunc: tuple | None = None) -> None:
+        """A slip outside a packet: the receiver's misaligned symbol is a code
+        error, so EDB without start; the next unit must start with COM."""
+        self.unmatched_end(EDB)
+        self.garbage(self.pos() - 1, bits, trunc)
+
+    def outside(self, data: bytes) -> None:
+        """Bytes outside a packet: idle runs (0x00) and stray data runs."""
+        i = 0
+        while i < len(data):
+            j = i
+            zero = data[i] == 0
+            while j < len(data) and (data[j] == 0) == zero:
+                j += 1
+            if zero:
+                self.idle(j - i)
+            else:
+                self.stray(data[i:j])
+            i = j
+
+    def dllp_cut(self, d: Dllp, p: int, bits: str) -> None:
+        """A DLLP whose body symbol p is a code error: EDB ends it after p
+        bytes (dllp_edb); the rest is data outside a packet, then END."""
+        body = d.bytes4() + dllp_crc_wire(d.bytes4())
+        assert 0 <= p < 6
+        self.raw_dllp_bytes(body[:p], end=EDB)
+        self.code_error(self.pos() - 1, bits)
+        self.outside(body[p + 1:])
+        self.unmatched_end(END)
+
+    def tlp_cut(self, t: Tlp, p: int, bits: str) -> Unit:
+        """A TLP whose body symbol p is a code error, at a length that is a
+        valid TLP framing (>= 18, multiple of 4 after the seq bytes), so
+        the DLL decoder sees a TLP ended by EDB with a wrong LCRC."""
+        tb = t.bytes()
+        sb = bytes([(t.seq >> 8) & 0x0F, t.seq & 0xFF])
+        body = sb + tb + lcrc_wire(sb + tb)
+        assert 18 <= p < len(body) and (p - 6) % 4 == 0
+        cut = body[:p]
+        good = lcrc_wire(cut[:-4])
+        assert cut[-4:] != bytes(x ^ 0xFF for x in good), "cut would look nullified"
+        a = self._put(STP, True)
+        for x in cut:
+            self._put(x)
+        self._put(EDB, True)
+        u = self._unit("tlp", a, dict(tlp=t, body=cut, nbytes=p - 6, lcrc=cut[-4:], good_lcrc=good,
+                                      lcrc_mode="cut", end=EDB))
+        self.code_error(self.pos() - 1, bits)
+        self.outside(body[p + 1:])
+        self.unmatched_end(END)
+        return u
+
+    def os_cut(self, rest: list[tuple[int, bool]]) -> None:
+        """COM and `rest`, then electrical idle: unknown_os with `symbol` =
+        its last symbol (SPEC §11.3 via §10.8 item 1)."""
+        a = self._put(COM, True)
+        ts = bool(rest) and (not rest[0][1] or rest[0][0] == PAD)
+        for byte, k in rest:
+            self._put(byte, k, ts=ts)
+        self._unit("os_unknown", a, dict(symbol=rest[-1][0] if rest else COM))
+        self.cuts.append(self.pos())
+
+    def finish(self) -> None:
+        n = len(self.syms)
+        assert self.line_ev.get(0, [(None,)])[-1][0] == "burst", "the first symbol needs a burst"
+        idle_at = []
+        for i, evs in self.line_ev.items():
+            kinds = [e[0] for e in evs]
+            if "idle" in kinds:
+                assert kinds == (["idle", "burst"] if i < n else ["idle"]), (i, kinds)
+                idle_at.append(i)
+                if i > 0:   # Stream.finish checks "truncated by electrical idle" against this
+                    self.specials[i] = [dict(kind="gate", signal="electrical idle", edges=0)]
+            else:
+                assert kinds == ["burst"] and i == 0, (i, kinds)
+        super().finish()
+        for idx, m in self.marks.items():
+            if m[0] == "garbage":
+                nx = idx + 1
+                assert nx < n and self.syms[nx].k and self.syms[nx].byte == COM and nx not in self.line_ev
+        for c in self.cuts:
+            assert c in idle_at, "os_cut must be followed by electrical idle"
+        # Stay clear of what SPEC §11 does not settle: a coalescable run or an
+        # idle run on both sides of a break.
+        by_a = {u.a: u for u in self.units}
+        by_b = {u.b: u for u in self.units}
+        for i in idle_at:
+            if 0 < i < n:
+                u1, u2 = by_b[i - 1], by_a[i]
+                assert not (u1.kind == u2.kind and u1.kind in ("ts", "fts", "eieos", "idle")), (i, u1.kind)
+
+
+@dataclass
+class LineItem:
+    kind: str                  # raw (no symbol), sym, garbage
+    idx: int | None
+    bits: str
+    run_fs: int | None = None  # an explicit single run of this duration
+    pos: int = 0               # first bit, within the burst
+
+
+@dataclass
+class LineBurst:
+    rate: str
+    jitter: int | None
+    decide: int | None = None
+    items: list = field(default_factory=list)
+    bits: str = ""
+    runs: list = field(default_factory=list)
+
+
+@dataclass
+class SerialLine:
+    changes: list              # (fs, "0"|"1"|"x"|"z"), intended levels (before any inversion)
+    end_fs: int
+    bursts: list
+
+
+def _flip(v: str) -> str:
+    return {"0": "1", "1": "0"}[v]
+
+
+def _pick(prng: Prng, lo: int, hi: int, step: int) -> int:
+    """A tick-aligned value in [lo, hi], often an end point."""
+    r = prng.byte()
+    if r < 48:
+        return lo
+    if r < 96:
+        return hi
+    span = (hi - lo) // step + 1
+    v = (prng.byte() << 16) | (prng.byte() << 8) | prng.byte()
+    return lo + (v % span) * step
+
+
+def transmit(st: SerialStream, fpt: int) -> SerialLine:
+    """8b/10b-encode the finished stream with RD tracking and lay the bits
+    out in time: each burst at its UI, edges displaced when it has jitter."""
+    assert st.finished
+    changes: list = []
+    t = 0
+    last_v: str | None = None
+
+    def put(v: str, at: int) -> None:
+        nonlocal last_v
+        assert v != last_v, ("not a change", at, v)
+        assert not changes or at > changes[-1][0]
+        assert at % fpt == 0, (at, fpt)
+        changes.append((at, v))
+        last_v = v
+
+    def resolve(v: str) -> str:
+        if v == "~":
+            assert last_v in ("0", "1")
+            return _flip(last_v)
+        return v
+
+    def pieces(ps: list) -> None:
+        nonlocal t
+        for v, dur in ps:
+            v = resolve(v)
+            assert v in "xz" or dur > IDLE_RUN_FS, "a level piece must be electrical idle (> 8 ns)"
+            put(v, t)
+            t += dur
+
+    bursts: list[LineBurst] = []
+
+    def close(b: LineBurst) -> None:
+        nonlocal t
+        ui = UI_FS[b.rate]
+        assert ui % fpt == 0, "bits must land on whole ticks"
+        runs: list[list] = []      # [level, nbits, fs, explicit]
+        pos = 0
+        for it in b.items:
+            it.pos = pos
+            pos += len(it.bits)
+            if it.run_fs is not None:
+                lv = it.bits[0]
+                assert set(it.bits) == {lv} and (not runs or runs[-1][0] != lv)
+                runs.append([lv, len(it.bits), it.run_fs, True])
+                continue
+            for ch in it.bits:
+                if runs and runs[-1][0] == ch:
+                    assert not runs[-1][3], "an explicit run must be followed by the other level"
+                    runs[-1][1] += 1
+                else:
+                    runs.append([ch, 1, None, False])
+        b.bits = "".join(it.bits for it in b.items)
+        for r in runs:
+            if r[2] is None:
+                r[2] = r[1] * ui
+        times = [t]
+        for r in runs[:-1]:
+            times.append(times[-1] + r[2])
+        if b.jitter is not None:
+            # Every edge inside the burst moves by up to UI/2 - 1 tick; two
+            # neighbours never move apart by UI/2 or more, so each run still
+            # rounds to its bit count (SPEC §11.5).
+            assert not any(r[3] for r in runs)
+            amp = ui // 2 - fpt
+            prng = Prng(b.jitter)
+            prev = 0
+            for j in range(1, len(runs)):
+                lo = max(-amp, prev - ui // 2)
+                hi = min(amp, prev + ui // 2 - fpt)
+                d = _pick(prng, lo, hi, fpt)
+                times[j] += d
+                prev = d
+        for j, r in enumerate(runs):
+            put(r[0], times[j])
+        b.runs = runs
+        t = times[0] + sum(r[2] for r in runs)
+        bursts.append(b)
+
+    pieces(st.lead_pieces)
+    cur: LineBurst | None = None
+    rd = -1
+    n = len(st.syms)
+    for i in range(n + 1):
+        for ev in st.line_ev.get(i, []):
+            if ev[0] == "burst":
+                assert cur is None
+                plan: BurstPlan = ev[1]
+                rd = plan.rd
+                cur = LineBurst(plan.rate, plan.jitter, plan.decide)
+                for pc in plan.prelock:
+                    if pc[0] == "bits":
+                        cur.items.append(LineItem("raw", None, pc[1]))
+                    elif pc[0] == "data":
+                        bits = ""
+                        for byte in pc[1]:
+                            c, rd = enc8b10b(byte, False, rd)
+                            bits += c
+                        cur.items.append(LineItem("raw", None, bits[pc[2]:]))
+                    elif pc[0] == "run":
+                        _, lv, nb, fs = pc
+                        if lv == "~":
+                            prev_bits = "".join(x.bits for x in cur.items)
+                            lv = _flip(prev_bits[-1]) if prev_bits else resolve("~")
+                        cur.items.append(LineItem("raw", None, lv * nb, fs))
+                    else:
+                        raise ValueError(pc)
+            else:
+                _, ps, partial = ev
+                assert cur is not None
+                if partial:
+                    assert len(partial) < 10
+                    cur.items.append(LineItem("raw", None, partial))
+                close(cur)
+                cur = None
+                pieces(ps)
+        if i == n:
+            break
+        assert cur is not None, f"symbol {i} outside a burst"
+        s = st.syms[i]
+        m = st.marks.get(i)
+        if m and m[0] == "code":
+            cur.items.append(LineItem("sym", i, m[1]))
+            continue
+        if m and m[0] == "garbage":
+            bits = m[1]
+            if bits is None:
+                byte, k, ln = m[2]
+                bits = enc8b10b(byte, k, rd)[0][:ln]
+            assert 1 <= len(bits) <= 9
+            cur.items.append(LineItem("garbage", i, bits))
+            continue
+        code, after = enc8b10b(s.wire, s.k, rd)
+        for r in st.wrong_ranges:
+            if r[3] is None and r[0] <= i <= r[1]:
+                wcode, wafter = enc8b10b(s.wire, s.k, -rd)
+                if wcode != code:
+                    r[3] = i
+                    code = wcode
+                    if r[2]:
+                        after = wafter
+                break
+        cur.items.append(LineItem("sym", i, code))
+        rd = after
+    if cur is not None:
+        close(cur)
+        # The run that is still open at the end is never decoded (SPEC §11.2),
+        # so the last symbol is followed by a transition.
+        put(_flip(last_v), t)
+        t += 7 * UI_FS[cur.rate]
+    assert all(r[3] is not None for r in st.wrong_ranges), "a wrong_rd range had no RD-dependent symbol"
+    return SerialLine(changes, t, bursts)
+
+
+@dataclass
+class SerialNames:
+    scope: tuple = ("tb", "dut")
+    line: str = "txp"
+    complement: str | None = None   # an unbound TXN carrying the inverse
+    redundant: bool = False         # re-write the current value inside some runs
+
+
+def write_serial_vcd(line: SerialLine, timescale: tuple[int, str], invert: bool,
+                     names: SerialNames) -> tuple[str, str]:
+    """(VCD text, path of the line signal). `invert` writes the line inverted
+    (an inverted pair), which the decoder's `invert` parameter undoes."""
+    fpt = fs_per_tick(*timescale)
+    ev: dict[int, list] = {}
+
+    def vcd(v: str) -> str:
+        return _flip(v) if invert and v in "01" else v
+
+    assert line.changes and line.changes[0][0] == 0
+    for k, (t, v) in enumerate(line.changes):
+        assert t % fpt == 0
+        ev.setdefault(t // fpt, []).append(("!", vcd(v)))
+        if names.complement:
+            ev[t // fpt].append(('"', _flip(vcd(v)) if v in "01" else v))
+        nxt = line.changes[k + 1][0] if k + 1 < len(line.changes) else line.end_fs
+        if names.redundant and k % 4 == 1:
+            mid = (t + nxt) // 2 // fpt
+            if t // fpt < mid < nxt // fpt:
+                ev.setdefault(mid, []).append(("!", vcd(v)))
+    end = line.end_fs // fpt
+    assert line.end_fs % fpt == 0 and max(ev) < end
+    out = ["$version wavecrux-decoders decoders/pcie/tools/generate_fixtures.py $end\n",
+           f"$timescale {timescale[0]}{timescale[1]} $end\n"]
+    for sc in names.scope:
+        out.append(f"$scope module {sc} $end\n")
+    out.append(f"$var wire 1 ! {names.line} $end\n")
+    if names.complement:
+        out.append(f'$var wire 1 " {names.complement} $end\n')
+    for _ in names.scope:
+        out.append("$upscope $end\n")
+    out.append("$enddefinitions $end\n")
+    for tick in sorted(ev):
+        out.append(f"#{tick}\n")
+        lines = [f"{v}{i}\n" for i, v in ev[tick]]
+        if tick == 0:
+            out += ["$dumpvars\n"] + lines + ["$end\n"]
+        else:
+            out += lines
+    out.append(f"#{end}\n")
+    return "".join(out), ".".join(names.scope + (names.line,))
+
+
+def host_line_samples(text: str, fpt: int) -> list[tuple[int, str]]:
+    """The WaveCrux host for one bound 1-bit signal `!`: one sample per time
+    the VCD writes it, the final `#time` not fed. Times in fs."""
+    samples: list[tuple[int, str]] = []
+    t = None
+    body = text.split("$enddefinitions $end\n", 1)[1]
+    for ln in body.splitlines():
+        if ln.startswith("#"):
+            t = int(ln[1:])
+        elif ln.endswith("!") and len(ln) == 2:
+            if samples and samples[-1][0] == t * fpt:
+                samples[-1] = (t * fpt, ln[0])
+            else:
+                samples.append((t * fpt, ln[0]))
+    return samples
+
+
+@dataclass
+class RecBurst:
+    rate: str
+    bits: list      # (level, start_fs, end_fs)
+    rule: int       # the SPEC §11.4 rule that decided it (0: fixed rate)
+    runs: int
+
+
+def recover(samples: list[tuple[int, str]], invert: bool, rate: str) -> tuple[list, list]:
+    """SPEC §11.2-§11.5 on the host's samples: (bursts, idle periods). An
+    idle period is (start, end, reported)."""
+    tokens: list = []
+    cur: list | None = None
+    for t, v in samples:
+        if v in "xz":
+            if cur:
+                tokens.append(("run", cur[0], t, cur[1]))
+                cur = None
+            tokens.append(("unknown", t))
+            continue
+        lv = _flip(v) if invert else v
+        if cur and cur[1] == lv:
+            continue           # a repeated level does not end a run
+        if cur:
+            tokens.append(("run", cur[0], t, cur[1]))
+        cur = [t, lv]
+    # `cur`, still open, is never decoded.
+    bursts: list[RecBurst] = []
+    idles: list = []
+    held: list | None = None
+    idle_start: int | None = None
+    idle_rep = False
+    seen_bits = False
+
+    def end_burst() -> None:
+        nonlocal held
+        if held is None:
+            return
+        r, rule = rate, 0
+        if r == "auto":
+            r, rule = "gen1", 3
+            for k, (_, d, _) in enumerate(held):
+                if d < GEN2_RUN_FS:
+                    r, rule = "gen2", 1
+                    break
+                if k + 1 == RATE_RUNS:
+                    rule = 2                             # gen1
+                    break
+        ui = UI_FS[r]
+        bits = []
+        for ta, d, lv in held:
+            nb = max(1, (d + ui // 2) // ui)
+            for i in range(nb):
+                bits.append((lv, ta + (i * d) // nb, ta + ((i + 1) * d) // nb))
+        bursts.append(RecBurst(r, bits, rule, len(held)))
+        held = None
+
+    for tok in tokens:
+        if tok[0] == "unknown" or tok[2] - tok[1] > IDLE_RUN_FS:
+            if idle_start is None:
+                end_burst()
+                idle_start = tok[1]
+                idle_rep = seen_bits
+            continue
+        _, ta, tb, lv = tok
+        if idle_start is not None:
+            idles.append((idle_start, ta, idle_rep))
+            idle_start = None
+        if held is None:
+            held = []
+        held.append((ta, tb - ta, lv))
+        seen_bits = True
+    end_burst()                       # flush: held runs as Gen1 (SPEC §11.9)
+    if idle_start is not None:
+        idles.append((idle_start, samples[-1][0], idle_rep))
+    return bursts, idles
+
+
+class SerialTiming:
+    """Symbol index -> (start, end) fs, from the recovered bit times."""
+
+    def __init__(self, times: dict[int, tuple[int, int]], n: int) -> None:
+        assert sorted(times) == list(range(n)), "every symbol must be placed on the line"
+        self.times = times
+
+    def span(self, a: int, b: int) -> tuple[int, int]:
+        return self.times[a][0], self.times[b][1]
+
+
+def align(b: LineBurst, st: SerialStream) -> list[tuple]:
+    """SPEC §11.6 driven by the transmitter's intent: where its COMs end.
+    Asserts the line holds no other COM pattern, then returns the receiver's
+    symbol slots: (kind, first bit, item, shift)."""
+    com_end: dict[int, LineItem] = {}
+    at: dict[int, LineItem] = {}
+    for it in b.items:
+        if it.kind in ("sym", "garbage"):
+            at[it.pos] = it
+        if it.kind == "sym" and st.syms[it.idx].k and st.syms[it.idx].byte == COM:
+            assert it.bits in (COM_MINUS, COM_PLUS)
+            com_end[it.pos + 10] = it
+    bits = b.bits
+    found = {p for p in range(10, len(bits) + 1) if bits[p - 10:p] in (COM_MINUS, COM_PLUS)}
+    assert found == set(com_end), f"COM pattern where none was sent, ending at bits {sorted(found - set(com_end))}"
+    slots: list[tuple] = []
+    bnd: int | None = None
+    for p in range(1, len(bits) + 1):
+        if p in com_end:
+            it = com_end[p]
+            if bnd is None:
+                slots.append(("lock", p - 10, it, 0))
+            elif p - bnd == 10:
+                assert at.get(bnd) is it
+                slots.append(("sym", bnd, it, 0))
+            else:
+                k = p - bnd
+                assert 1 <= k <= 9
+                slots.append(("realign", p - 10, it, k))
+            bnd = p
+        elif bnd is not None and p - bnd == 10:
+            it = at.get(bnd)
+            assert it is not None, f"the receiver's symbol at bit {bnd} is not one the transmitter sent"
+            slots.append(("garbage" if it.kind == "garbage" else "sym", bnd, it, 0))
+            bnd = p
+    assert [s[2].idx for s in slots] == [it.idx for it in b.items if it.kind in ("sym", "garbage")], \
+        "receiver symbols differ from the transmitted ones"
+    return slots
+
+
+def serial_line_txs(st: SerialStream, line: SerialLine, rec: list[RecBurst], pipe: bool
+                    ) -> tuple[list[Tx], dict[int, tuple[int, int]]]:
+    """SPEC §11.6-§11.8 from the transmitter's intent, timed by the
+    recovered bits: lock, realign, code and disparity errors."""
+    out: list[Tx] = []
+    times: dict[int, tuple[int, int]] = {}
+    for lb, rb in zip(line.bursts, rec):
+        slots = align(lb, st)
+        rd: int | None = None
+        for kind, p, it, k in slots:
+            s = st.syms[it.idx]
+            span = (rb.bits[p][1], rb.bits[p + 9][2])
+            times[it.idx] = span
+            group = lb.bits[p:p + 10]
+            if kind in ("lock", "realign"):
+                # §11.6: the RD before it is the one its form needs.
+                rd = enc8b10b(COM, True, -1 if group == COM_MINUS else 1)[1]
+                if kind == "lock":
+                    if pipe:
+                        out.append(Tx(*span, f"Symbol lock ({RATE_TEXT[lb.rate]})", False,
+                                      [("type", "symbol_lock"), ("rate", lb.rate)]))
+                else:
+                    out.append(Tx(*span, f"Symbol lock moved by {k} bit{'s' if k > 1 else ''}", True,
+                                  [("type", "realign"), ("shift", k),
+                                   ("error", LINE_ERROR_TEXT["realign"])]))
+                continue
+            assert rd is not None
+            if group not in ALL_CODES:
+                assert s.k and s.byte == EDB, "a code error feeds EDB"
+                out.append(Tx(*span, "8b/10b code error", True,
+                              [("type", "code_error"), ("code", group),
+                               ("error", LINE_ERROR_TEXT["code_error"])]))
+                continue
+            assert kind == "sym", f"slipped group {group} at symbol {it.idx} is a valid code {ALL_CODES[group]}"
+            assert group == it.bits
+            c_cur, a_cur = enc8b10b(s.wire, s.k, rd)
+            c_opp, a_opp = enc8b10b(s.wire, s.k, -rd)
+            if group == c_cur:
+                rd = a_cur
+            else:
+                assert group == c_opp
+                out.append(Tx(*span, f"Disparity error {sym_name(s.wire, s.k)}", True,
+                              [("type", "disparity_error"), ("code", group), ("symbol", h2(s.wire)),
+                               ("error", LINE_ERROR_TEXT["disparity_error"])]))
+                rd = a_opp
+    return out, times
+
+
+def expected_serial(st: SerialStream, line: SerialLine, samples: list[tuple[int, str]],
+                    decoder: str, params: dict) -> list[Tx]:
+    pipe = decoder == "ferrite.pcie_serial"
+    assert pipe or decoder == "ferrite.pcie_serial_dll"
+    rate = params.get("rate", "auto")
+    rec, idles = recover(samples, params.get("invert", False), rate)
+    # The waveform must carry exactly the bits the transmitter laid out, at
+    # the rate it meant.
+    assert len(rec) == len(line.bursts), (len(rec), len(line.bursts))
+    for lb, rb in zip(line.bursts, rec):
+        assert rb.rate == lb.rate, (rb.rate, lb.rate)
+        if lb.decide is not None:
+            assert rate == "auto" and rb.rule == lb.decide, (lb.decide, rb.rule, rb.runs)
+        assert "".join(b[0] for b in rb.bits) == lb.bits, "recovered bits differ from the transmitted ones"
+    line_txs, times = serial_line_txs(st, line, rec, pipe)
+    if pipe:
+        line_txs += [Tx(a, b, "Electrical idle", False, [("type", "electrical_idle")])
+                     for a, b, rep in idles if rep]
+    tm = SerialTiming(times, len(st.syms))
+    coalesce = params.get("coalesce", True)
+    show_idle = params.get("show_idle", False)
+
+    def run(view: str) -> list[Tx]:
+        check_view(st, view)
+        txs = pipe_engine(st, tm, coalesce, show_idle) if pipe else dll_engine(st, tm)
+        return txs + line_txs
+
+    mode = params.get("scrambling", "auto")
+    txs = select_scrambling(st, tm, mode, run)
+    assert mode != "auto" or "(undetermined)" not in txs[-1].label, \
+        "serial auto without a lock: the last-buffered order is not modelled"
+    return txs
