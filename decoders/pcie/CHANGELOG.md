@@ -6,6 +6,8 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
 ### Added
 
 - PCIe serial line decoders (`ferrite.pcie_serial`, `ferrite.pcie_serial_dll`,
