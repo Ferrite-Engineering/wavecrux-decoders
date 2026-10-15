@@ -157,9 +157,9 @@ WCX_TEST(wrong_disparity_and_invalid_codes) {
     WCX_CHECK_EQ_U64(byte, 0xAA);
     // Bits above the 10-bit group are ignored.
     rd = false;
-    WCX_CHECK_EQ_U64(pcie_8b10b_decode(&t8, (uint16_t)(0xFC00u | PCIE_CODE_COM_NEG), &rd, &byte,
-                                       &k),
-                     PCIE_DEC_OK);
+    WCX_CHECK_EQ_U64(
+        pcie_8b10b_decode(&t8, (uint16_t)(0xFC00u | PCIE_CODE_COM_NEG), &rd, &byte, &k),
+        PCIE_DEC_OK);
     WCX_CHECK_EQ_U64(byte, 0xBC);
     WCX_CHECK(k);
 }

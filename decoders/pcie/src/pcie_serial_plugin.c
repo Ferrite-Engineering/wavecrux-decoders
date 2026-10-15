@@ -28,7 +28,7 @@ static const wcx_signal_spec k_signals[SIG_COUNT] = {{"line", 1, false}};
 
 // ── manifests (SPEC.md §11.1) ──────────────────────────────────────────────
 
-#define MANIFEST_SERIAL_SIGNALS                                                                 \
+#define MANIFEST_SERIAL_SIGNALS                                                               \
     "\"signals\":[{\"name\":\"line\",\"bit_width\":1,\"description\":\"The serial line: TXP " \
     "or RXP of one lane, from a SerDes model. X or Z is read as electrical idle\"}],"
 
@@ -40,9 +40,9 @@ static const wcx_signal_spec k_signals[SIG_COUNT] = {{"line", 1, false}};
     "\"enum_labels\":{\"auto\":\"Detect\",\"gen1\":\"2.5 GT/s (Gen1)\",\"gen2\":\"5.0 GT/s "    \
     "(Gen2)\"}}"
 
-#define MANIFEST_PARAM_INVERT                                                                \
-    "{\"name\":\"invert\",\"kind\":\"bool\",\"default\":false,"                              \
-    "\"display_name\":\"Invert the line\","                                                  \
+#define MANIFEST_PARAM_INVERT                                                               \
+    "{\"name\":\"invert\",\"kind\":\"bool\",\"default\":false,"                             \
+    "\"display_name\":\"Invert the line\","                                                 \
     "\"description\":\"Invert every bit: for an inverted differential pair, or when the N " \
     "side is bound\"}"
 
@@ -50,17 +50,16 @@ static const char k_manifest_serial[] =
     "{\"description\":\"PCI Express Gen1/Gen2 from the serial line (x1, 8b/10b): bit "
     "recovery, symbol lock, 8b/10b and disparity errors, electrical idle, and the PIPE "
     "decoder's view: ordered sets, logical idle, TLP and DLLP framing\","
-    "\"category\":\"highSpeed\"," MANIFEST_SERIAL_SIGNALS
-    "\"parameters\":[" MANIFEST_PARAM_RATE "," MANIFEST_PARAM_INVERT "," MANIFEST_PARAM_SCRAMBLING
-    "," MANIFEST_PARAM_COALESCE "," MANIFEST_PARAM_SHOW_IDLE "]}";
+    "\"category\":\"highSpeed\"," MANIFEST_SERIAL_SIGNALS "\"parameters\":[" MANIFEST_PARAM_RATE
+    "," MANIFEST_PARAM_INVERT "," MANIFEST_PARAM_SCRAMBLING "," MANIFEST_PARAM_COALESCE
+    "," MANIFEST_PARAM_SHOW_IDLE "]}";
 
 static const char k_manifest_serial_dll[] =
     "{\"description\":\"PCI Express Gen1/Gen2 Data Link Layer from the serial line (x1, "
     "8b/10b): DLLPs with CRC-16 checks, TLPs with LCRC checks, header names and sequence "
     "tracking, with 8b/10b, disparity and symbol alignment errors\","
-    "\"category\":\"highSpeed\"," MANIFEST_SERIAL_SIGNALS
-    "\"parameters\":[" MANIFEST_PARAM_RATE "," MANIFEST_PARAM_INVERT "," MANIFEST_PARAM_SCRAMBLING
-    "]}";
+    "\"category\":\"highSpeed\"," MANIFEST_SERIAL_SIGNALS "\"parameters\":[" MANIFEST_PARAM_RATE
+    "," MANIFEST_PARAM_INVERT "," MANIFEST_PARAM_SCRAMBLING "]}";
 
 // Manifest enum order matches pcie_rate_param and pcie_scrambling_param.
 static const char *const k_rates[] = {"auto", "gen1", "gen2"};

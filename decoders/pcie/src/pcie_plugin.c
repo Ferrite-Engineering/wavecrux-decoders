@@ -4,8 +4,8 @@
 // The wcx_pcie plugin: ten decoders (SPEC.md §1). Eight are four PIPE data
 // widths times the PIPE decoder and the Data Link Layer decoder, all sharing
 // one set of callbacks, here; the two serial line decoders (§11) are in
-// pcie_serial_plugin.c and registered at the end of this file. The class a handle was created from tells on_sample how
-// many byte lanes a `data` word holds and which front end to run.
+// pcie_serial_plugin.c and registered at the end of this file. The class a handle was created from
+// tells on_sample how many byte lanes a `data` word holds and which front end to run.
 //
 // This file owns everything that is per clock edge (SPEC.md §4): edge
 // detection and the sample point, symbol times, gating by rxvalid and
@@ -402,9 +402,8 @@ static const pcie_variant *find_variant(const wcx_decoder *d) {
 }
 
 static const wcx_decoder_class *const k_classes[] = {
-    &k_pipe_w8, &k_pipe_w16, &k_pipe_w32, &k_pipe_w64,
-    &k_dll_w8,  &k_dll_w16,  &k_dll_w32,  &k_dll_w64,
-    &pcie_serial_class, &pcie_serial_dll_class,
+    &k_pipe_w8, &k_pipe_w16, &k_pipe_w32, &k_pipe_w64,        &k_dll_w8,
+    &k_dll_w16, &k_dll_w32,  &k_dll_w64,  &pcie_serial_class, &pcie_serial_dll_class,
 };
 
 WCX_PLUGIN("PCIe decoders (PIPE, Data Link Layer)",

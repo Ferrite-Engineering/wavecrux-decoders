@@ -27,10 +27,10 @@ typedef struct sdrv {
     bool bit[MAX_BITS];
     size_t n;
     bool rd_pos;
-    uint64_t t;      // time of the next bit
+    uint64_t t; // time of the next bit
     uint64_t ui;
-    bool have_last;  // a sample has been fed
-    bool last;       // its level
+    bool have_last; // a sample has been fed
+    bool last;      // its level
 } sdrv;
 
 static bool sopen(sdrv *d, wcx_test *t, const char *id, const char *params_json, uint64_t ui) {
@@ -188,7 +188,8 @@ WCX_TEST(symbols_view_shows_lock_ordered_sets_and_frames) {
     WCX_CHECK_STR_EQ(d.log.items[0].fields, "{\"type\":\"symbol_lock\",\"rate\":\"gen1\"}");
     WCX_CHECK_EQ_U64(d.log.items[0].start, 1000000);
     WCX_CHECK_EQ_U64(d.log.items[0].end, 1000000u + 10u * PCIE_UI_GEN1_FS);
-    WCX_CHECK(has_label(&d.log, "TS1 \xC3\x97" "2 link=PAD lane=PAD n_fts=24 gen1"));
+    WCX_CHECK(has_label(&d.log, "TS1 \xC3\x97"
+                                "2 link=PAD lane=PAD n_fts=24 gen1"));
     WCX_CHECK(has_label(&d.log, "SKP"));
     WCX_CHECK(has_label(&d.log, "DLLP frame (6 symbols)"));
     sclose(&d);
@@ -235,9 +236,8 @@ WCX_TEST(code_and_disparity_errors_in_the_dll_view) {
     const size_t ce = txlog_find(&d.log, "8b/10b code error");
     WCX_REQUIRE(ce != SIZE_MAX);
     WCX_CHECK(d.log.items[ce].is_error);
-    WCX_CHECK_STR_EQ(d.log.items[ce].fields,
-                     "{\"type\":\"code_error\",\"code\":\"1111111111\","
-                     "\"error\":\"Not a valid 8b/10b code group.\"}");
+    WCX_CHECK_STR_EQ(d.log.items[ce].fields, "{\"type\":\"code_error\",\"code\":\"1111111111\","
+                                             "\"error\":\"Not a valid 8b/10b code group.\"}");
     // The substituted EDB has no packet open.
     WCX_CHECK(has_label(&d.log, "EDB without start"));
     const size_t de = txlog_find(&d.log, "Disparity error D0.0");
@@ -249,8 +249,8 @@ WCX_TEST(code_and_disparity_errors_in_the_dll_view) {
 
 WCX_TEST(realign_label_counts_bits) {
     sdrv d;
-    WCX_REQUIRE(sopen(&d, t, "ferrite.pcie_serial_dll", "{\"scrambling\":\"off\",\"rate\":\"gen1\"}",
-                      PCIE_UI_GEN1_FS));
+    WCX_REQUIRE(sopen(&d, t, "ferrite.pcie_serial_dll",
+                      "{\"scrambling\":\"off\",\"rate\":\"gen1\"}", PCIE_UI_GEN1_FS));
     ts1(&d);
     sbits(&d, 0x0u, 3u); // three slipped bits
     ts1(&d);

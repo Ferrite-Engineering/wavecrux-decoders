@@ -36,13 +36,16 @@ static size_t count(const evlog *log, pcie_line_event_kind kind) {
     return n;
 }
 
+// The which-th event of a kind, or an all-zero event when there are fewer
+// (never NULL; the tests check the counts first).
 static const pcie_line_event *nth(const evlog *log, pcie_line_event_kind kind, size_t which) {
+    static const pcie_line_event k_none;
     for (size_t i = 0; i < log->n; i++) {
         if (log->ev[i].kind == kind && which-- == 0u) {
             return &log->ev[i];
         }
     }
-    return NULL;
+    return &k_none;
 }
 
 static size_t index_of(const evlog *log, pcie_line_event_kind kind) {
@@ -97,7 +100,7 @@ static uint64_t drive(pcie_line *l, const wire *w, uint64_t t0, uint64_t ui) {
     return end;
 }
 
-static const uint8_t k_ts1[16] = {0xBC, 0xF7, 0xF7, 24, 0x02, 0x00, 0x4A, 0x4A,
+static const uint8_t k_ts1[16] = {0xBC, 0xF7, 0xF7, 24,   0x02, 0x00, 0x4A, 0x4A,
                                   0x4A, 0x4A, 0x4A, 0x4A, 0x4A, 0x4A, 0x4A, 0x4A};
 
 static void put_ts1(wire *w) {
@@ -248,9 +251,9 @@ WCX_TEST(bit_count_rounds_half_up_and_times_floor) {
     pcie_line_sample(l, t0 + PCIE_UI_GEN1_FS, false, true); // the 0 bit ends: COM complete
     WCX_REQUIRE(count(&log, PCIE_LINE_SYMBOL) == 1u);
     const uint64_t a = t0 + PCIE_UI_GEN1_FS;
-    pcie_line_sample(l, a + d3, false, false);             // 3 ones
-    pcie_line_sample(l, a + d3 + 600000u, false, true);    // 1.5 UI: 2 zeros
-    pcie_line_sample(l, a + d3 + 600000u + 596000u, false, false); // 1.49 UI: 1 one
+    pcie_line_sample(l, a + d3, false, false);                         // 3 ones
+    pcie_line_sample(l, a + d3 + 600000u, false, true);                // 1.5 UI: 2 zeros
+    pcie_line_sample(l, a + d3 + 600000u + 596000u, false, false);     // 1.49 UI: 1 one
     pcie_line_sample(l, a + d3 + 600000u + 596000u + 1u, false, true); // glitch: 1 zero
     pcie_line_sample(l, a + d3 + 600000u + 596000u + 1u + 3u * PCIE_UI_GEN1_FS, false, false);
     // 3 + 2 + 1 + 1 + 3 = 10 bits: 1110010111 is not a code group.
@@ -392,7 +395,7 @@ WCX_TEST(idle_before_any_bits_is_not_reported) {
     pcie_line_init(l, PCIE_RATE_GEN1, false, record, &log);
     pcie_line_sample(l, 0, true, false); // X at the start
     pcie_line_sample(l, 1000000, false, false);
-    pcie_line_sample(l, 20000000, false, true); // 19 ns of 0: still idle (merged)
+    pcie_line_sample(l, 20000000, false, true);  // 19 ns of 0: still idle (merged)
     pcie_line_sample(l, 20400000, false, false); // a 1-bit run: idle ends at 20000000
     WCX_CHECK_EQ_U64(count(&log, PCIE_LINE_IDLE_BEGIN), 1);
     WCX_CHECK_EQ_U64(count(&log, PCIE_LINE_IDLE_PERIOD), 0);
@@ -428,8 +431,8 @@ WCX_TEST(flush_ends_idle_at_the_open_run) {
     wire w = {0};
     put_ts1(&w);
     const uint64_t end = drive(l, &w, 0, PCIE_UI_GEN1_FS);
-    pcie_line_sample(l, end + 400000u, true, false);   // X
-    pcie_line_sample(l, end + 2000000u, false, true);  // known again: the open run
+    pcie_line_sample(l, end + 400000u, true, false);  // X
+    pcie_line_sample(l, end + 2000000u, false, true); // known again: the open run
     pcie_line_flush_runs(l);
     pcie_line_flush_idle(l, end + 3000000u);
     WCX_REQUIRE(count(&log, PCIE_LINE_IDLE_PERIOD) == 1u);

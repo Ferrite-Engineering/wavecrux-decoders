@@ -24,12 +24,12 @@
 #include "pcie_8b10b.h"
 #include "pcie_symbols.h"
 
-#define PCIE_UI_GEN1_FS  UINT64_C(400000)  // 2.5 GT/s
-#define PCIE_UI_GEN2_FS  UINT64_C(200000)  // 5.0 GT/s
-#define PCIE_IDLE_RUN_FS UINT64_C(8000000) // §11.3: a longer run is electrical idle
-#define PCIE_GEN2_RUN_FS UINT64_C(300000)  // §11.4: a shorter run decides Gen2
-#define PCIE_RATE_HOLD_RUNS    40u      // §11.4: runs held before deciding Gen1
-#define PCIE_SYMBOL_BITS       10u
+#define PCIE_UI_GEN1_FS     UINT64_C(400000)  // 2.5 GT/s
+#define PCIE_UI_GEN2_FS     UINT64_C(200000)  // 5.0 GT/s
+#define PCIE_IDLE_RUN_FS    UINT64_C(8000000) // §11.3: a longer run is electrical idle
+#define PCIE_GEN2_RUN_FS    UINT64_C(300000)  // §11.4: a shorter run decides Gen2
+#define PCIE_RATE_HOLD_RUNS 40u               // §11.4: runs held before deciding Gen1
+#define PCIE_SYMBOL_BITS    10u
 
 typedef enum pcie_rate_param {
     PCIE_RATE_AUTO = 0, // manifest enum order
