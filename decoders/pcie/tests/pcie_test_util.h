@@ -94,9 +94,9 @@ static inline void test_sink_free(test_sink *s) {
 // ── the plugin through its ABI ─────────────────────────────────────────────
 
 static inline WcDecoderDef abi_find(wcx_test *t, const char *id) {
-    WcDecoderDef defs[8];
+    WcDecoderDef defs[16];
     memset(defs, 0, sizeof defs);
-    size_t n = 8;
+    size_t n = 16;
     WCX_CHECK_EQ_I64(wavecrux_decoder_register(defs, &n), WC_DECODER_OK);
     for (size_t i = 0; i < n; i++) {
         if (strcmp(defs[i].id, id) == 0) {

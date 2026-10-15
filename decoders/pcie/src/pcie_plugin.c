@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Ferrite Engineering LLC
 //
-// The wcx_pcie plugin: eight decoders (SPEC.md §1), four PIPE data widths
-// times the PIPE decoder and the Data Link Layer decoder, all sharing one
-// set of callbacks. The class a handle was created from tells on_sample how
+// The wcx_pcie plugin: ten decoders (SPEC.md §1). Eight are four PIPE data
+// widths times the PIPE decoder and the Data Link Layer decoder, all sharing
+// one set of callbacks, here; the two serial line decoders (§11) are in
+// pcie_serial_plugin.c and registered at the end of this file. The class a handle was created from tells on_sample how
 // many byte lanes a `data` word holds and which front end to run.
 //
 // This file owns everything that is per clock edge (SPEC.md §4): edge
@@ -17,6 +18,8 @@
 #include <string.h>
 
 #include "pcie_detector.h"
+#include "pcie_manifest.h"
+#include "pcie_serial_plugin.h"
 #include "pcie_symbols.h"
 #include "pcie_time.h"
 #include "wavecrux_decoder.h"
@@ -61,15 +64,6 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "decoder annotates SKP add/remove, receiver detection and PHY errors; the Data Link Layer " \
     "decoder ignores it\"}],"
 
-#define MANIFEST_PARAM_SCRAMBLING                                                               \
-    "{\"name\":\"scrambling\",\"kind\":\"enum\",\"default\":\"auto\","                          \
-    "\"display_name\":\"Scrambling\","                                                          \
-    "\"description\":\"Detect: run descrambled and plain decoding side by side until a packet " \
-    "with a correct CRC settles it. On: descramble (Gen1/Gen2 LFSR, reset by COM). Off: the "   \
-    "symbols are already plain, as in RTL simulation\","                                        \
-    "\"enum_values\":[\"auto\",\"on\",\"off\"],"                                                \
-    "\"enum_labels\":{\"auto\":\"Detect\",\"on\":\"On (descramble)\",\"off\":\"Off\"}}"
-
 #define MANIFEST_PARAM_SAMPLE_POINT                                                          \
     "{\"name\":\"sample_point\",\"kind\":\"enum\",\"default\":\"before_edge\","              \
     "\"display_name\":\"Sample point\","                                                     \
@@ -78,17 +72,6 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "\"enum_values\":[\"before_edge\",\"at_edge\"],"                                         \
     "\"enum_labels\":{\"before_edge\":\"Before the clock edge\",\"at_edge\":\"At the clock " \
     "edge\"}}"
-
-#define MANIFEST_PARAM_COALESCE                                                              \
-    "{\"name\":\"coalesce\",\"kind\":\"bool\",\"default\":true,"                             \
-    "\"display_name\":\"Coalesce repeated ordered sets\","                                   \
-    "\"description\":\"One transaction per run of identical TS1, TS2, FTS or EIEOS ordered " \
-    "sets, with a count\"}"
-
-#define MANIFEST_PARAM_SHOW_IDLE                                   \
-    "{\"name\":\"show_idle\",\"kind\":\"bool\",\"default\":false," \
-    "\"display_name\":\"Show logical idle\","                      \
-    "\"description\":\"One transaction per run of logical idle symbols between packets\"}"
 
 #define MANIFEST_PIPE(width, kwidth)                                                          \
     "{\"description\":\"PCI Express Gen1/Gen2 at the PIPE interface (x1, " width              \
@@ -421,6 +404,7 @@ static const pcie_variant *find_variant(const wcx_decoder *d) {
 static const wcx_decoder_class *const k_classes[] = {
     &k_pipe_w8, &k_pipe_w16, &k_pipe_w32, &k_pipe_w64,
     &k_dll_w8,  &k_dll_w16,  &k_dll_w32,  &k_dll_w64,
+    &pcie_serial_class, &pcie_serial_dll_class,
 };
 
 WCX_PLUGIN("PCIe decoders (PIPE, Data Link Layer)",

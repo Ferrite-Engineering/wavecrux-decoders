@@ -1,12 +1,14 @@
-# PCIe decoders (PIPE, Data Link Layer)
+# PCIe decoders (PIPE, serial line, Data Link Layer)
 
-Two WaveCrux protocol decoders for PCI Express Gen1/Gen2 (2.5 and 5 GT/s,
-8b/10b) as seen on a PIPE interface, shipped in one plugin library
-(`wcx_pcie`):
+WaveCrux protocol decoders for PCI Express Gen1/Gen2 (2.5 and 5 GT/s,
+8b/10b), shipped in one plugin library (`wcx_pcie`): two that read a PIPE
+interface, and two that read the serial line itself
+([below](#serial-line-decoders)).
 
 | Decoder | Ids | Shows |
 |---|---|---|
 | **PCIe PIPE** | `ferrite.pcie_pipe_w8`, `_w16`, `_w32`, `_w64` | Ordered sets (TS1/TS2 with link, lane, N_FTS, rate and training control; SKP; FTS; EIOS; EIEOS), logical idle, TLP and DLLP frames, RxStatus events, symbol and framing errors |
+| **PCIe serial line** | `ferrite.pcie_serial` (symbols), `ferrite.pcie_serial_dll` (Data Link Layer) | The same two views from the 1-bit TXP or RXP of a SerDes model, plus symbol lock, 8b/10b code and disparity errors, realignment and electrical idle |
 | **PCIe Data Link Layer** | `ferrite.pcie_dll_w8`, `_w16`, `_w32`, `_w64` | Every Gen1/Gen2 DLLP (Ack, Nak, InitFC1/InitFC2/UpdateFC for P, NP and Cpl, PM_*, Vendor) with CRC-16 checks; TLPs with LCRC checks, nullified TLPs, the header name (MRd32, MWr64, CfgRd0, CplD, Msg, …), Length, TC, TD and EP, the Length check, and sequence-number tracking (replays, wrap at 4096, out-of-order errors) |
 
 The four ids per decoder are the four PIPE data widths (8, 16, 32 and 64
@@ -100,9 +102,45 @@ field, and never stop the decode: it resynchronises at the next symbol.
   start, data outside a packet, unknown ordered sets, X/Z on the data bus,
   PHY-reported RxStatus errors.
 
+## Serial line decoders
+
+`ferrite.pcie_serial` and `ferrite.pcie_serial_dll` decode one direction of
+an x1 link from its serial line in simulation, where a SerDes model drives
+TXP/RXP bit by bit. They recover the bits from the transition times, find
+symbol boundaries on COM, decode 8b/10b, and then show exactly what the PIPE
+decoder (`pcie_serial`) or the Data Link Layer decoder (`pcie_serial_dll`)
+shows. The contract is [`SPEC.md`](SPEC.md) §11.
+
+| Signal | Width | Meaning |
+|---|---|---|
+| `line` | 1 | TXP or RXP of one lane. X or Z is read as electrical idle |
+
+| Parameter | Values | Default | Meaning |
+|---|---|---|---|
+| `rate` | `auto` (Detect), `gen1` (2.5 GT/s), `gen2` (5.0 GT/s) | `auto` | `auto` decides per burst: a run of bits shorter than 300 ps means Gen2; otherwise Gen1 after 40 runs. A speed change goes through electrical idle, so each burst is decided again |
+| `invert` | bool | `false` | Invert every bit, for an inverted pair or the N side bound |
+| `scrambling` | as above | `auto` | as above |
+| `coalesce`, `show_idle` | as above | | `pcie_serial` only |
+
+On top of the PIPE and DLL output they add:
+
+- `Symbol lock (Gen1, 2.5 GT/s)` where a burst first aligns on COM
+  (`pcie_serial` only).
+- `8b/10b code error` (the code group, in wire order; the symbol is replaced
+  by EDB, as a PIPE PHY does) and `Disparity error D21.5` (decoded anyway).
+- `Symbol lock moved by 3 bits` when a COM arrives off the symbol boundary,
+  for example after a bit slip.
+- `Electrical idle` for each idle period after the line has been active
+  (`pcie_serial` only), and `Packet truncated by electrical idle`.
+
+**Timescale.** A Gen2 bit is 200 ps. Dump the line with a timescale of
+100 ps or finer (1 ps or 10 ps is usual for SerDes models); at 1 ns the bits
+cannot be placed. A run of one level longer than 8 ns is taken as electrical
+idle, not data.
+
 ## Limits
 
-- **x1 links only.** A multi-lane link stripes symbols across lanes and
+- **x1 links only**, for the serial decoders too (one lane, no deskew). A multi-lane link stripes symbols across lanes and
   needs lane deskew; bound to lane 0 of a wider link the PIPE decoder still
   shows the ordered sets, but packets will appear broken.
 - Gen1/Gen2 (8b/10b) only; no 128b/130b, no Gen3 equalisation TS fields.
@@ -120,7 +158,8 @@ cmake --build --preset dev
 ctest --preset dev -R pcie
 ```
 
-`tests/unit_*.c` hold the unit tests (CRCs, scrambler, framing, both front
-ends, scrambling detection and the plugin's ABI behaviour), `tests/vcd/`
+`tests/unit_*.c` hold the unit tests (CRCs, scrambler, 8b/10b, framing,
+both front ends, the serial line front end, scrambling detection and the
+plugin's ABI behaviour), `tests/vcd/`
 hand-derived smoke fixtures, `fixtures/` the independently generated golden
 fixtures, and `fuzz/` the libFuzzer target and its seed corpus.

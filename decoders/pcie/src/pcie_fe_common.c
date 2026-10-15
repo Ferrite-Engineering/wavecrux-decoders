@@ -25,6 +25,8 @@ static const char *trunc_by_name(pcie_trunc_by by) {
             return "rxvalid";
         case PCIE_TRUNC_TXELECIDLE:
             return "txelecidle";
+        case PCIE_TRUNC_ELECIDLE:
+            return "electrical idle";
         case PCIE_TRUNC_END_OF_TRACE:
             return "end of trace";
         default: /* defensive: every pcie_trunc_by is handled above */

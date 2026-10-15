@@ -518,17 +518,32 @@ static void flush_stream(pcie_pipeline *p) {
     p->state = PST_OUT;
 }
 
+// What a gating break truncates an open packet "by".
+static pcie_trunc_by gating_trunc(pcie_break_reason reason) {
+    switch (reason) {
+        case PCIE_BREAK_RXVALID:
+            return PCIE_TRUNC_RXVALID;
+        case PCIE_BREAK_TXELECIDLE:
+            return PCIE_TRUNC_TXELECIDLE;
+        case PCIE_BREAK_ELECIDLE:
+        case PCIE_BREAK_UNKNOWN:
+        case PCIE_BREAK_FLUSH:
+        default: /* only the three gating reasons reach here */
+            return PCIE_TRUNC_ELECIDLE;
+    }
+}
+
 void pcie_pipeline_break(pcie_pipeline *p, pcie_break_reason reason) {
     if (reason == PCIE_BREAK_FLUSH) {
         flush_stream(p);
         return;
     }
-    const bool gating = reason == PCIE_BREAK_RXVALID || reason == PCIE_BREAK_TXELECIDLE;
+    const bool gating = reason == PCIE_BREAK_RXVALID || reason == PCIE_BREAK_TXELECIDLE ||
+                        reason == PCIE_BREAK_ELECIDLE;
     run_end(p);
     break_os(p, gating);
     if (p->state == PST_PKT && gating) {
-        truncate_packet(p,
-                        reason == PCIE_BREAK_RXVALID ? PCIE_TRUNC_RXVALID : PCIE_TRUNC_TXELECIDLE);
+        truncate_packet(p, gating_trunc(reason));
     }
     // §4.4: an open packet is dropped silently on X/Z.
     p->state = PST_OUT;

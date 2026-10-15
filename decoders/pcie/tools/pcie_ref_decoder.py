@@ -17,6 +17,12 @@ C decoders. Its CRCs are table-free reflected implementations and zlib, not
 the encoder's bit-serial ones.
 
     python3 pcie_ref_decoder.py --vcd X.vcd --bindings X.bindings.json
+
+The serial decoders (ferrite.pcie_serial, ferrite.pcie_serial_dll, SPEC §11)
+are handled by the same entry point: runs, electrical idle, line rate, bits,
+symbol alignment and 8b/10b decoding feed the same Pipeline. The 8b/10b
+decode tables are built from the standard's sub-block tables (not from an
+encoder) and checked against protocol-notes §9 at import.
 """
 
 from __future__ import annotations
@@ -285,6 +291,16 @@ class Pipeline:
     # edge-level events
     def gate(self, reason: str) -> None:
         self.end_xz()
+        if self.state == "os":      # §10.8 item 1
+            o = self.os
+            if self.os_kind == "skp" and len(o) > 1:
+                self.os_done()
+            else:
+                self.end_os_run()
+                self.emit(Tx(o[0][2], o[-1][3], "Unknown ordered set", True,
+                             [("type", "unknown_os"), ("symbol", h2(o[-1][0])),
+                              ("error", ERROR_TEXT["unknown_os"])]))
+                self.state = "idle"
         self.end_runs()
         if self.state == "pkt":
             self.truncate(reason)
@@ -704,8 +720,95 @@ def decode_dllp(body: bytes, a: int, e: int) -> Tx:
     return Tx(a, e, label, err, fields)
 
 
+class Scrambler:
+    """SPEC §5.5: the scrambling-mode lock, shared by the PIPE and serial
+    paths. Owns the `off` and `on` pipelines and the buffered output."""
+
+    CEILING = 4096
+
+    def __init__(self, kind: str, mode: str, coalesce: bool, show_idle: bool) -> None:
+        mk = lambda m: Pipeline(kind, m, coalesce, show_idle)  # noqa: E731
+        self.pipes = {"off": mk("off"), "on": mk("on")} if mode == "auto" else {mode: mk(mode)}
+        self.locked = None if mode == "auto" else mode
+        self.final: list[Tx] = []
+
+    def _lock(self, view: str, span, why: str = "detected") -> None:
+        self.locked = view
+        self.final.extend(self.pipes[view].out)
+        self.pipes[view].out = []
+        if span is not None:
+            self.final.append(Tx(span[0], span[1], f"Scrambling: {view} ({why})", False,
+                                 [("type", "scrambling_detected"), ("mode", view)]))
+        for k in list(self.pipes):
+            if k != view:
+                del self.pipes[k]
+
+    def _undetermined(self) -> None:
+        off = self.pipes["off"]
+        if off.out:
+            last = off.out[-1]
+            span = (last.start, last.end)
+        else:
+            span = off.last_sym or (0, 0)
+        self._lock("off", span, "undetermined")
+
+    def poll(self) -> None:
+        if self.locked is not None:
+            return
+        off, on = self.pipes["off"], self.pipes["on"]
+        if off.ds_seen:
+            self._lock("off", off.ds_seen, "training sets")
+        elif off.valid_close or on.valid_close:
+            v = "off" if off.valid_close else "on"
+            self._lock(v, self.pipes[v].valid_close)
+        elif len(off.out) >= self.CEILING:
+            self._undetermined()
+
+    def symbol(self, byte: int, k: bool, s: int, d: int) -> None:
+        for pl in self.pipes.values():
+            pl.symbol(byte, k, s, d)
+        self.poll()
+
+    def emit(self, tx: Tx) -> None:
+        for pl in self.pipes.values():
+            pl.emit(tx)
+        self.poll()
+
+    def gate(self, reason: str) -> None:
+        for pl in self.pipes.values():
+            pl.gate(reason)
+        self.poll()
+
+    def xz_edge(self, a: int, b: int) -> None:
+        for pl in self.pipes.values():
+            pl.xz_edge(a, b)
+        self.poll()
+
+    def flush(self) -> None:
+        for pl in self.pipes.values():
+            pl.flush()
+
+    def finish(self) -> list[Tx]:
+        if self.locked is None:
+            self._undetermined()
+        else:
+            self.final.extend(self.pipes[self.locked].out)
+        return self.final
+
+
+SERIAL_IDS = {"ferrite.pcie_serial": "pipe", "ferrite.pcie_serial_dll": "dll"}
+
+
+def _flag(v) -> bool:
+    if isinstance(v, str):
+        return v.strip().lower() == "true"
+    return bool(v)
+
+
 def decode(vcd: str, bindings: dict) -> tuple[int, list[Tx]]:
     decoder = bindings["decoder"]
+    if decoder in SERIAL_IDS:
+        return decode_serial(vcd, bindings)
     kind = "pipe" if decoder.startswith("ferrite.pcie_pipe") else "dll"
     n = int(decoder.rsplit("_w", 1)[1]) // 8
     params = {"scrambling": "auto", "sample_point": "before_edge", "coalesce": True, "show_idle": False}
@@ -723,24 +826,7 @@ def decode(vcd: str, bindings: dict) -> tuple[int, list[Tx]]:
             v = v[-w:]
         return v
 
-    mode = params["scrambling"]
-    mk = lambda m: Pipeline(kind, m, params["coalesce"], params["show_idle"])  # noqa: E731
-    pipes = {"off": mk("off"), "on": mk("on")} if mode == "auto" else {mode: mk(mode)}
-    locked = None if mode == "auto" else mode
-    final: list[Tx] = []
-
-    def lock(view: str, span, why: str = "detected") -> None:
-        nonlocal locked
-        locked = view
-        final.extend(pipes[view].out)
-        pipes[view].out = []
-        if span is not None:
-            final.append(Tx(span[0], span[1], f"Scrambling: {view} ({why})", False,
-                            [("type", "scrambling_detected"), ("mode", view)]))
-        for k in list(pipes):
-            if k != view:
-                del pipes[k]
-
+    scr = Scrambler(kind, params["scrambling"], params["coalesce"], params["show_idle"])
     prev = None
     prev_t = None
     prev_rx = 0
@@ -765,43 +851,348 @@ def decode(vcd: str, bindings: dict) -> tuple[int, list[Tx]]:
                     fl = [("type", "rxstatus"), ("code", "0b" + format(code, "03b"))]
                     if code >= 4:
                         fl.append(("error", RXSTATUS_ERROR[code]))
-                    for pl in pipes.values():
-                        pl.emit(Tx(span_e[0], span_e[1], f"RxStatus: {names[code]}", code >= 4, fl))
+                    scr.emit(Tx(span_e[0], span_e[1], f"RxStatus: {names[code]}", code >= 4, fl))
                 prev_rx = code
             if gated:
-                for pl in pipes.values():
-                    pl.gate(gated)
+                scr.gate(gated)
             elif any(c in "xz" for c in d + dk):
-                for pl in pipes.values():
-                    pl.xz_edge(*span_e)
+                scr.xz_edge(*span_e)
             else:
                 dv, kv = int(d, 2), int(dk, 2)
                 for j in range(n):
-                    s = tfs + (j * p) // n
-                    for pl in pipes.values():
-                        pl.symbol((dv >> (8 * j)) & 0xFF, bool((kv >> j) & 1), s, p // n)
-                    if locked is None:
-                        if pipes["off"].ds_seen:
-                            lock("off", pipes["off"].ds_seen, "training sets")
-                        elif pipes["off"].valid_close or pipes["on"].valid_close:
-                            v = "off" if pipes["off"].valid_close else "on"
-                            lock(v, pipes[v].valid_close)
+                    scr.symbol((dv >> (8 * j)) & 0xFF, bool((kv >> j) & 1), tfs + (j * p) // n, p // n)
         prev = sample
-    for pl in pipes.values():
-        pl.flush()
-    if locked is None:
-        off = pipes["off"]
-        if off.out:
-            last = off.out[-1]
-            span = (last.start, last.end)
+    scr.flush()
+    return fpt, scr.finish()
+
+
+# ── 8b/10b decode tables (protocol-notes §9, SPEC §11.7) ─────────────────────
+# Built from the sub-block tables of the standard, in the decoding direction:
+# a code group is split into its 6-bit and 4-bit sub-blocks, each looked up
+# under the running disparity in force at its start, with sub-block disparity
+# tracking the RD. There is no encoder here; the known answers are asserted.
+
+_X6 = ("100111/011000 011101/100010 101101/010010 110001 110101/001010 101001 011001 111000/000111 "
+       "111001/000110 100101 010101 110100 001101 101100 011100 010111/101000 011011/100100 100011 "
+       "010011 110010 001011 101010 011010 111010/000101 110011/001100 100110 010110 110110/001001 "
+       "001110 101110/010001 011110/100001 101011/010100").split()
+_Y4_D = "1011/0100 1001 0101 1100/0011 1101/0010 1010 0110 1110/0001".split()
+_Y4_K = "1011/0100 0110/1001 1010/0101 1100/0011 1101/0010 0101/1010 1001/0110 0111/1000".split()
+_Y4_D7_ALT = "0111/1000"
+_K7_X = (23, 27, 29, 30)
+_ALT_NEG_X = (17, 18, 20)     # D.x.7 uses the alternate form after a negative 6b RD
+_ALT_POS_X = (11, 13, 14)     # ... or after a positive one
+
+
+def _other(rd: str) -> str:
+    return "+" if rd == "-" else "-"
+
+
+def _forms(entry: str) -> tuple[str, str]:
+    """(form used when the RD is negative, form used when it is positive)."""
+    if "/" in entry:
+        a, b = entry.split("/")
+        assert b == "".join("1" if c == "0" else "0" for c in a), entry
+        return a, b
+    return entry, entry
+
+
+def _build_8b10b():
+    assert len(_X6) == 32 and len(_Y4_D) == 8 and len(_Y4_K) == 8
+    s6 = {"-": {}, "+": {}}
+    for x, entry in enumerate(_X6):
+        neg, pos = _forms(entry)
+        if "/" not in entry:
+            assert neg.count("1") == 3, entry          # a lone form is balanced
         else:
-            span = off.last_sym
-        final.extend(off.out)
-        final.append(Tx(span[0], span[1], "Scrambling: off (undetermined)", False,
-                        [("type", "scrambling_detected"), ("mode", "off")]))
-    else:
-        final.extend(pipes[locked].out)
-    return fpt, final
+            assert neg.count("1") in (3, 4), entry     # the RD- form never reduces ones below 3
+        for rd, code in (("-", neg), ("+", pos)):
+            assert code not in s6[rd], (x, code)
+            s6[rd][code] = ("D", x)
+    for rd, code in (("-", "001111"), ("+", "110000")):
+        assert code not in s6[rd]
+        s6[rd][code] = ("K", 28)
+    d4 = {"-": {}, "+": {}}
+    k4 = {"-": {}, "+": {}}
+    for y in range(8):
+        for tab, ent in ((d4, _Y4_D[y]), (k4, _Y4_K[y])):
+            neg, pos = _forms(ent)
+            for rd, code in (("-", neg), ("+", pos)):
+                assert code not in tab[rd], (y, code)
+                tab[rd][code] = y
+    alt_n, alt_p = _forms(_Y4_D7_ALT)
+    alt = {"-": alt_n, "+": alt_p}
+
+    def step(rd: str, code: str) -> str:
+        """RD after a sub-block (more ones: positive; fewer: negative)."""
+        d = 2 * code.count("1") - len(code)
+        if d > 0:
+            assert rd == "-", (rd, code)
+            return "+"
+        if d < 0:
+            assert rd == "+", (rd, code)
+            return "-"
+        return rd
+
+    def decode10(code: str, rd: str):
+        sub = s6[rd].get(code[:6])
+        if sub is None:
+            return None
+        mid = step(rd, code[:6])
+        c4, kind, x = code[6:], sub[0], sub[1]
+        y = None
+        is_k = False
+        if kind == "K":
+            y = k4[mid].get(c4)
+            is_k = True
+        else:
+            alt_here = (mid == "-" and x in _ALT_NEG_X) or (mid == "+" and x in _ALT_POS_X)
+            y = d4[mid].get(c4)
+            if y == 7 and alt_here:
+                y = None
+            if y is None and c4 == alt[mid] and alt_here:
+                y = 7
+            if y is None and x in _K7_X and k4[mid].get(c4) == 7:
+                y, is_k = 7, True
+        if y is None:
+            return None
+        return (y << 5) | x, is_k, step(mid, c4)
+
+    dec = {"-": {}, "+": {}}
+    for rd in "-+":
+        for n in range(1024):
+            code = format(n, "010b")
+            r = decode10(code, rd)
+            if r is not None:
+                dec[rd][code] = r
+    return dec
+
+
+DEC8B10B = _build_8b10b()
+
+
+def _selfcheck_8b10b() -> None:
+    # protocol-notes §9 known answers: (byte, is_k, code at RD-, RD after, code at RD+, RD after)
+    known = [
+        (0xBC, True, "0011111010", "+", "1100000101", "-"),
+        (0x1C, True, "0011110100", "-", "1100001011", "+"),
+        (0x3C, True, "0011111001", "+", "1100000110", "-"),
+        (0x5C, True, "0011110101", "+", "1100001010", "-"),
+        (0x7C, True, "0011110011", "+", "1100001100", "-"),
+        (0xFC, True, "0011111000", "-", "1100000111", "+"),
+        (0xF7, True, "1110101000", "-", "0001010111", "+"),
+        (0xFB, True, "1101101000", "-", "0010010111", "+"),
+        (0xFD, True, "1011101000", "-", "0100010111", "+"),
+        (0xFE, True, "0111101000", "-", "1000010111", "+"),
+        (0x00, False, "1001110100", "-", "0110001011", "+"),
+        (0x4A, False, "0101010101", "-", "0101010101", "+"),
+        (0x45, False, "1010010101", "-", "1010010101", "+"),
+        (0xB5, False, "1010101010", "-", "1010101010", "+"),
+        (0xE7, False, "1110001110", "+", "0001110001", "-"),
+        (0xF1, False, "1000110111", "+", "1000110001", "-"),
+        (0xEB, False, "1101001110", "+", "1101001000", "-"),
+    ]
+    for byte, k, cn, rn, cp, rp in known:
+        assert DEC8B10B["-"].get(cn) == (byte, k, rn), (hex(byte), cn, DEC8B10B["-"].get(cn))
+        assert DEC8B10B["+"].get(cp) == (byte, k, rp), (hex(byte), cp, DEC8B10B["+"].get(cp))
+    # structure: 256 D + 12 K symbols reachable at each RD; no code means two symbols
+    for rd in "-+":
+        syms = {(b, k) for b, k, _ in DEC8B10B[rd].values()}
+        assert len(syms) == 268, (rd, len(syms))
+        assert sum(1 for _, k in syms if k) == 12
+    for code, r in DEC8B10B["-"].items():
+        if code in DEC8B10B["+"]:
+            assert DEC8B10B["+"][code][:2] == r[:2], code
+
+
+_selfcheck_8b10b()
+
+
+def symbol_name(byte: int, k: bool) -> str:
+    return f"{'K' if k else 'D'}{byte & 0x1F}.{byte >> 5}"
+
+
+# ── the serial line (SPEC §11) ───────────────────────────────────────────────
+
+UI_FS = {"gen1": 400_000, "gen2": 200_000}
+IDLE_RUN_FS = 8_000_000     # a run longer than this is electrical idle
+GEN2_RUN_FS = 300_000       # a run shorter than this means Gen2
+RATE_HOLD_RUNS = 40
+COM_NEG, COM_POS = "0011111010", "1100000101"
+
+
+class SerialLine:
+    """§11.2-§11.8: from change-time samples of one line to pipeline symbols."""
+
+    def __init__(self, scr: Scrambler, kind: str, rate: str) -> None:
+        self.scr = scr
+        self.pipe = kind == "pipe"          # lock / idle transactions are pcie_serial only
+        self.fixed = None if rate == "auto" else rate
+        self.run = None                     # (t_a, level) of the open run
+        self.idle = None                    # {"start", "end" (tentative or None), "reported"}
+        self.any_converted = False
+        self.last_t = None
+        self._reset_burst()
+
+    def _reset_burst(self) -> None:
+        self.rate = self.fixed
+        self.held: list = []
+        self.locked = False
+        self.hist: list = []
+        self.buf: list = []
+        self.rd = None
+
+    # runs and idle
+    def sample(self, t: int, level) -> None:
+        self.last_t = t
+        if level is None:
+            if self.run is not None:
+                ta, lv = self.run
+                self.run = None
+                self._finish_run(ta, t, lv)
+            self._begin_idle(t)
+            return
+        if self.run is not None:
+            ta, lv = self.run
+            if lv == level:
+                return
+            self._finish_run(ta, t, lv)
+        self.run = (t, level)
+        if self.idle is not None:
+            self.idle["end"] = t            # ends here unless this run is itself idle
+
+    def _begin_idle(self, t: int) -> None:
+        if self.idle is None:
+            self._end_burst()
+            self.scr.gate("electrical idle")
+            self.idle = {"start": t, "end": None, "reported": self.any_converted}
+        else:
+            self.idle["end"] = None
+
+    def _emit_idle(self, end: int) -> None:
+        idle, self.idle = self.idle, None
+        if idle["reported"] and self.pipe:
+            self.scr.emit(Tx(idle["start"], end, "Electrical idle", False, [("type", "electrical_idle")]))
+
+    def _finish_run(self, ta: int, tb: int, level: int) -> None:
+        d = tb - ta
+        if d > IDLE_RUN_FS:
+            self._begin_idle(ta)
+            return
+        if self.idle is not None:
+            self._emit_idle(self.idle["end"] if self.idle["end"] is not None else ta)
+        self.any_converted = True
+        if self.rate is None:               # rate=auto, undecided: hold (§11.4)
+            self.held.append((ta, d, level))
+            if d < GEN2_RUN_FS:
+                self.rate = "gen2"
+            elif len(self.held) >= RATE_HOLD_RUNS:
+                self.rate = "gen1"
+            if self.rate is not None:
+                self._flush_held()
+        else:
+            self._bits(ta, d, level)
+
+    def _flush_held(self) -> None:
+        held, self.held = self.held, []
+        for ta, d, lv in held:
+            self._bits(ta, d, lv)
+
+    def _end_burst(self) -> None:
+        if self.held:
+            self.rate = "gen1"
+            self._flush_held()
+        self._reset_burst()
+
+    # bits (§11.5)
+    def _bits(self, ta: int, d: int, level: int) -> None:
+        ui = UI_FS[self.rate]
+        n = max(1, (2 * d + ui) // (2 * ui))
+        for i in range(n):
+            self._bit(level, ta + (i * d) // n, ta + ((i + 1) * d) // n)
+
+    # alignment (§11.6)
+    def _bit(self, b: int, s: int, e: int) -> None:
+        self.hist.append((b, s, e))
+        if len(self.hist) > 10:
+            del self.hist[0]
+        comma = len(self.hist) == 10 and "".join(str(x[0]) for x in self.hist) in (COM_NEG, COM_POS)
+        if not self.locked:
+            if comma:
+                self.locked = True
+                self.buf = []
+                g = self.rate
+                if self.pipe:
+                    self.scr.emit(Tx(self.hist[0][1], self.hist[-1][2],
+                                     f"Symbol lock ({'Gen1, 2.5' if g == 'gen1' else 'Gen2, 5.0'} GT/s)", False,
+                                     [("type", "symbol_lock"), ("rate", g)]))
+                self._decode(list(self.hist), forced=self._com_rd())
+            return
+        self.buf.append((b, s, e))
+        k = len(self.buf)
+        if k == 10:
+            bits, self.buf = self.buf, []
+            self._decode(bits)
+        elif comma:
+            bits = list(self.hist)
+            self.buf = []
+            self.scr.emit(Tx(bits[0][1], bits[-1][2], f"Symbol lock moved by {k} bit{'s' if k != 1 else ''}",
+                             True, [("type", "realign"), ("shift", k),
+                                    ("error", "A COM arrived off the symbol boundary; symbol alignment moved to it.")]))
+            self._decode(bits, forced=self._com_rd())
+
+    def _com_rd(self) -> str:
+        return "-" if "".join(str(x[0]) for x in self.hist) == COM_NEG else "+"
+
+    # 8b/10b (§11.7)
+    def _decode(self, bits: list, forced: str | None = None) -> None:
+        code = "".join(str(x[0]) for x in bits)
+        s, e = bits[0][1], bits[-1][2]
+        rd = forced or self.rd
+        r = DEC8B10B[rd].get(code)
+        if r is None:
+            r2 = DEC8B10B[_other(rd)].get(code)
+            if r2 is None:
+                self.scr.emit(Tx(s, e, "8b/10b code error", True,
+                                 [("type", "code_error"), ("code", code),
+                                  ("error", "Not a valid 8b/10b code group.")]))
+                self.rd = rd
+                self.scr.symbol(EDB, True, s, e - s)
+                return
+            self.scr.emit(Tx(s, e, f"Disparity error {symbol_name(r2[0], r2[1])}", True,
+                             [("type", "disparity_error"), ("code", code), ("symbol", h2(r2[0])),
+                              ("error", "The code group is valid only for the other running disparity.")]))
+            r = r2
+        self.rd = r[2]
+        self.scr.symbol(r[0], r[1], s, e - s)
+
+    # end of trace (§11.9)
+    def finish_pre(self) -> None:
+        if self.held:
+            self.rate = "gen1"
+            self._flush_held()
+
+    def finish_post(self) -> None:
+        if self.idle is not None:
+            self._emit_idle(self.idle["end"] if self.idle["end"] is not None else self.last_t)
+
+
+def decode_serial(vcd: str, bindings: dict) -> tuple[int, list[Tx]]:
+    kind = SERIAL_IDS[bindings["decoder"]]
+    params = {"rate": "auto", "invert": False, "scrambling": "auto", "coalesce": True, "show_idle": False}
+    params.update(bindings.get("parameters", {}))
+    invert, coalesce, show_idle = _flag(params["invert"]), _flag(params["coalesce"]), _flag(params["show_idle"])
+    fpt, end, changes, _ = read_vcd(vcd, {"line": bindings["signal_bindings"]["line"]})
+    scr = Scrambler(kind, params["scrambling"], coalesce, show_idle)
+    line = SerialLine(scr, kind, params["rate"])
+    for t, sample in host_samples(changes, end):
+        v = sample.get("line", "x")[-1]
+        level = None if v in "xz" else (int(v) ^ (1 if invert else 0))
+        line.sample(t * fpt, level)
+    line.finish_pre()
+    scr.flush()
+    line.finish_post()
+    return fpt, scr.finish()
 
 
 def dart_string(s: str) -> str:

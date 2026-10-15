@@ -11,6 +11,10 @@
   a bug and must be understood.
 
     python3 decoders/pcie/tools/capture_check.py            # cross-check generated/
+
+The reference decoder dispatches on the bindings' decoder id, so the PIPE,
+DLL and serial (ferrite.pcie_serial, ferrite.pcie_serial_dll) fixtures all go
+through the same ref_output().
 """
 
 from __future__ import annotations

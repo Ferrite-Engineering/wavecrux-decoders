@@ -1,4 +1,4 @@
-# PCIe decoders: output specification (v0.1)
+# PCIe decoders: output specification (v0.2)
 
 This is the contract between the C decoders in `src/` and the independent
 fixture generator in `tools/`. Both are written from this document and the
@@ -10,7 +10,7 @@ wrong.
 Protocol facts and verified known answers (K-codes, ordered-set layout,
 scrambler keys, DLLP CRC-16, TLP LCRC-32) are in `docs/protocol-notes.md`.
 
-## 1. One plugin, eight decoders
+## 1. One plugin, ten decoders
 
 The plugin library is `wcx_pcie`; plugin name "PCIe decoders (PIPE, Data
 Link Layer)"; description "Open source, Apache-2.0. Ferrite Engineering,
@@ -32,6 +32,14 @@ of that width, so each decoder is registered once per PIPE data width:
 
 N = symbols per clock = width / 8. Byte lane j (bits `8j+7:8j` of `data`,
 bit j of `datak`) is the j-th symbol on the wire. x1 links only.
+
+Two more decoders read the serial line itself instead of the PIPE
+interface; §11 specifies them, and §2-§4 do not apply to them:
+
+| Id | Display name | Signal |
+|---|---|---|
+| `ferrite.pcie_serial` | PCIe serial line (symbols) | `line` (1 bit) |
+| `ferrite.pcie_serial_dll` | PCIe serial line (Data Link Layer) | `line` (1 bit) |
 
 ## 2. Signals (both decoders, in this manifest order)
 
@@ -459,3 +467,150 @@ adopted as written:
     unreachable.
 12. **The first edge** has P = 0, so its symbols have zero duration (start
     equals end).
+
+## 11. Serial line decoders
+
+`ferrite.pcie_serial` and `ferrite.pcie_serial_dll` decode one direction of
+an x1 Gen1/Gen2 link from its serial line in a simulation: the 1-bit TXP (or
+RXP) of a SerDes model. They recover the bits, find symbol boundaries,
+decode 8b/10b (protocol-notes.md §9) and feed the symbols to the same
+pipeline as the PIPE decoders (§5). `ferrite.pcie_serial` then reports what
+the PIPE decoder reports (§6, §7); `ferrite.pcie_serial_dll` what the DLL
+decoder reports (§6, §8). Both add the line-level transactions of §11.8.
+
+### 11.1 Signals and parameters
+
+| Name | Width | Required | Meaning |
+|---|---|---|---|
+| `line` | 1 | yes | The serial line: TXP or RXP of one lane. X or Z means electrical idle. |
+
+| Name | Kind | Values | Default | Decoders |
+|---|---|---|---|---|
+| `rate` | enum | `auto`, `gen1`, `gen2` | `auto` | both |
+| `invert` | bool | | `false` | both |
+| `scrambling` | enum | `auto`, `on`, `off` | `auto` | both |
+| `coalesce` | bool | | `true` | `pcie_serial` |
+| `show_idle` | bool | | `false` | `pcie_serial` |
+
+`enum_labels`: rate `{"auto": "Detect", "gen1": "2.5 GT/s (Gen1)", "gen2":
+"5.0 GT/s (Gen2)"}`; scrambling as in §3. `invert` inverts every bit of the
+line before anything else (an inverted differential pair, or RXN bound
+instead of RXP).
+
+The unit interval (UI) is 400 000 fs at Gen1 and 200 000 fs at Gen2.
+
+### 11.2 Runs
+
+The host delivers one sample per change time of `line`. A sample's level is
+`line` after `invert`, or **unknown** when it is X or Z.
+
+A **run** is a stretch of constant known level. It starts at the time `t_a`
+of the first sample with that level (the first known sample of the trace,
+the first known sample after an unknown one, or a sample whose level
+differs from the previous sample's) and ends at the time `t_b` of the next
+sample whose level differs or is unknown. Samples repeating the same level
+do not end a run. Its duration is `D = t_b - t_a`. The run still open at
+the end of the trace is not decoded: its length is unknown.
+
+### 11.3 Electrical idle
+
+- A run with `D > 8 000 000` fs (8 ns, 20 UI at Gen1) is **electrical
+  idle**, not bits.
+- An unknown sample begins electrical idle at its time; it lasts until the
+  next known sample, which starts a new run.
+- Back-to-back idle stretches (a long run then X/Z, or X/Z then a long run)
+  are one electrical-idle period.
+
+When electrical idle begins, the decoder drops the bits of any incomplete
+symbol, loses symbol lock (§11.6) and, with `rate=auto`, the rate (§11.4),
+and the pipeline sees a break like gating (§4.3, §10.8 item 1): an open
+packet is `Packet truncated by electrical idle`. The running disparity is
+forgotten. The first run after it starts a new **burst**.
+
+### 11.4 Line rate
+
+With `rate=gen1` or `gen2` the UI is fixed. With `auto` the rate is decided
+per burst: the burst's runs are held until
+
+1. a run with `D < 300 000` fs arrives: **Gen2**; or
+2. 40 runs are held and none was shorter: **Gen1**; or
+3. the burst ends (electrical idle or end of trace) first: **Gen1**.
+
+The held runs, the deciding one included, are then converted in order at
+that rate, and later runs of the burst are converted as they arrive.
+
+### 11.5 Bits
+
+A run of duration `D` holds `n = max(1, floor((D + UI/2) / UI))` bits of
+its level. Bit `i` (0 ≤ i < n) spans `[t_a + floor(i·D/n), t_a +
+floor((i+1)·D/n))`. A symbol spans the start of its first bit to the end of
+its tenth.
+
+### 11.6 Symbol alignment
+
+- **Unlocked** (at the start of every burst): after each bit, if the last
+  ten bits in wire order are a COM, `0011111010` or `1100000101`, the
+  decoder **locks**: those ten bits are a symbol, and every ten bits after
+  them is the next symbol. Bits before the lock produce nothing.
+- **Locked**: after each bit, if the last ten bits are a COM but end k bits
+  into a symbol (1 ≤ k ≤ 9), the decoder **realigns**: the k bits of the
+  incomplete symbol are dropped and the COM's ten bits (which overlap the
+  previous symbol) are the next symbol. Ten bits that complete a symbol on
+  the boundary are decoded normally whatever they hold.
+- The running disparity before a COM found by locking or realigning is the
+  one its form needs: negative for `0011111010`, positive for `1100000101`.
+
+### 11.7 8b/10b decoding
+
+A symbol's ten bits are compared with the encodings of protocol-notes.md §9
+(256 D symbols and the 12 K symbols) under the current running disparity:
+
+- They are the encoding of symbol s for the current RD: s is fed to the
+  pipeline and the RD becomes the one after s.
+- Otherwise they are the encoding of s for the opposite RD: a
+  `disparity_error` (§11.8); s is fed and the RD becomes the one after s
+  in that encoding.
+- Otherwise: a `code_error` (§11.8); EDB (K 0xFE) is fed in its place, as a
+  PIPE PHY substitutes it, and the RD is unchanged.
+
+The two RD tables never map one code to two different symbols, so s is
+unique.
+
+### 11.8 Line-level transactions
+
+| Situation | Label | `type` | Fields after `type` | `is_error` | Decoders |
+|---|---|---|---|---|---|
+| Lock (§11.6) | `Symbol lock (Gen1, 2.5 GT/s)` / `Symbol lock (Gen2, 5.0 GT/s)` | `symbol_lock` | `rate` (`"gen1"`/`"gen2"`) | false | `pcie_serial` |
+| Realign | `Symbol lock moved by 3 bits` (`by 1 bit`) | `realign` | `shift` (k), `error` | true | both |
+| Code error | `8b/10b code error` | `code_error` | `code` (`"0011111011"`, wire order), `error` | true | both |
+| Disparity error | `Disparity error K28.5` (the symbol's name, Dx.y or Kx.y) | `disparity_error` | `code`, `symbol` (`"0xBC"`), `error` | true | both |
+| Electrical idle | `Electrical idle` | `electrical_idle` | | false | `pcie_serial` |
+
+Each spans its symbol (lock, realign: the COM), except electrical idle,
+which spans its period: from the start of the long run or the first unknown
+sample to the start of the next run, or to the last sample of the trace when
+it is still idle there. An electrical-idle period is reported only when some
+run of the trace before it was converted to bits, so a line that starts at
+X or idle shows nothing until it is active. A transaction for a symbol is
+emitted before the symbol is fed, so it precedes what the symbol completes.
+
+`error` texts (§10.1 style):
+
+| `type` | `error` |
+|---|---|
+| `realign` | `A COM arrived off the symbol boundary; symbol alignment moved to it.` |
+| `code_error` | `Not a valid 8b/10b code group.` |
+| `disparity_error` | `The code group is valid only for the other running disparity.` |
+
+### 11.9 What else differs from the PIPE decoders
+
+- No `X/Z on data`, gating, sample point or RxStatus: the line has no
+  sideband, and X/Z is electrical idle.
+- Truncation by electrical idle: label `Packet truncated by electrical
+  idle`, otherwise as §6.
+- Scrambling `auto` (§5.5) is unchanged; line-level transactions before the
+  lock are buffered in both pipelines in time order, as edge-level
+  transactions are (§10.8 item 4).
+- Flush (§10.6): runs still held by `rate=auto` are converted as Gen1
+  first, then steps 1-4, then an electrical-idle period still open, then
+  step 5.

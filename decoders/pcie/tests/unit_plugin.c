@@ -32,7 +32,7 @@ static const expected_class k_expected[8] = {
     {"ferrite.pcie_dll_w64", "PCIe Data Link Layer (64-bit)", 8, true},
 };
 
-WCX_TEST(eight_decoders_register_in_spec_order) {
+WCX_TEST(ten_decoders_register_in_spec_order) {
     WCX_CHECK_EQ_U64(WAVECRUX_DECODER_ABI_GET_MAJOR(wavecrux_decoder_abi_version()), 1);
     WCX_CHECK_STR_EQ(wavecrux_decoder_plugin_name(), "PCIe decoders (PIPE, Data Link Layer)");
     WCX_CHECK_STR_EQ(wavecrux_decoder_plugin_description(),
@@ -40,12 +40,17 @@ WCX_TEST(eight_decoders_register_in_spec_order) {
                      "github.com/Ferrite-Engineering/wavecrux-decoders");
     size_t n = 0;
     WCX_CHECK_EQ_I64(wavecrux_decoder_register(NULL, &n), WC_DECODER_NEED_MORE_SLOTS);
-    WCX_CHECK_EQ_U64(n, 8);
-    WcDecoderDef defs[8];
+    WCX_CHECK_EQ_U64(n, 10);
+    WcDecoderDef defs[10];
     memset(defs, 0, sizeof defs);
-    n = 8;
+    n = 10;
     WCX_REQUIRE(wavecrux_decoder_register(defs, &n) == WC_DECODER_OK);
-    WCX_REQUIRE(n == 8);
+    WCX_REQUIRE(n == 10);
+    // §1: the two serial line decoders follow the eight PIPE ones.
+    WCX_CHECK_STR_EQ(defs[8].id, "ferrite.pcie_serial");
+    WCX_CHECK_STR_EQ(defs[8].display_name, "PCIe serial line (symbols)");
+    WCX_CHECK_STR_EQ(defs[9].id, "ferrite.pcie_serial_dll");
+    WCX_CHECK_STR_EQ(defs[9].display_name, "PCIe serial line (Data Link Layer)");
     for (size_t i = 0; i < 8; i++) {
         WCX_CHECK_STR_EQ(defs[i].id, k_expected[i].id);
         WCX_CHECK_STR_EQ(defs[i].display_name, k_expected[i].name);
@@ -56,8 +61,8 @@ WCX_TEST(eight_decoders_register_in_spec_order) {
 }
 
 WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
-    WcDecoderDef defs[8];
-    size_t n = 8;
+    WcDecoderDef defs[10];
+    size_t n = 10;
     WCX_REQUIRE(wavecrux_decoder_register(defs, &n) == WC_DECODER_OK);
     static const char *const sig_names[6] = {"pclk",    "data",       "datak",
                                              "rxvalid", "txelecidle", "rxstatus"};
@@ -473,7 +478,7 @@ WCX_TEST(parameters_are_checked_and_plumbed) {
 
 int main(void) {
     wcx_test t = WCX_TEST_INIT;
-    WCX_RUN(&t, eight_decoders_register_in_spec_order);
+    WCX_RUN(&t, ten_decoders_register_in_spec_order);
     WCX_RUN(&t, manifests_declare_the_spec_signals_and_parameters);
     WCX_RUN(&t, symbol_times_use_the_measured_period);
     WCX_RUN(&t, lane_times_floor_an_uneven_period);

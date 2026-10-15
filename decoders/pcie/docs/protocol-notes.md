@@ -214,4 +214,94 @@ link, the PIPE decoder bound to lane 0 still decodes ordered sets correctly.
 Packets will appear broken, so label them "multi-lane? framing unreliable"
 once TS1/TS2 show Lane# != 0 or when the link width is greater than 1.
 
----
+## 9. 8b/10b on the serial line (for the serial decoders)
+
+**Bit order.** A byte is `HGFEDCBA` (A = bit 0). The 5b/6b sub-block
+encodes `EDCBA` (x = byte & 0x1F) into `abcdei`; the 3b/4b sub-block
+encodes `HGF` (y = byte >> 5) into `fghj`. The ten bits go on the wire in
+the order `a b c d e i f g h j`. Every code below is written in wire order,
+first bit on the left. A symbol is named Dx.y or Kx.y.
+
+**Running disparity (RD).** Each sub-block is chosen by the RD in force
+when it starts: the 6-bit sub-block by the RD before the symbol, the 4-bit
+sub-block by the RD after the 6-bit one. A sub-block with more ones than
+zeros (or more zeros than ones) flips the RD; a balanced one keeps it,
+including the two balanced-but-paired forms `111000`/`000111` (D.7) and
+`1100`/`0011` (D.x.3, K.x.3).
+
+**5b/6b** (RD- form / RD+ form; one entry = both):
+
+| x | code | x | code | x | code | x | code |
+|---|---|---|---|---|---|---|---|
+| 0 | 100111 / 011000 | 8 | 111001 / 000110 | 16 | 011011 / 100100 | 24 | 110011 / 001100 |
+| 1 | 011101 / 100010 | 9 | 100101 | 17 | 100011 | 25 | 100110 |
+| 2 | 101101 / 010010 | 10 | 010101 | 18 | 010011 | 26 | 010110 |
+| 3 | 110001 | 11 | 110100 | 19 | 110010 | 27 | 110110 / 001001 |
+| 4 | 110101 / 001010 | 12 | 001101 | 20 | 001011 | 28 | 001110 |
+| 5 | 101001 | 13 | 101100 | 21 | 101010 | 29 | 101110 / 010001 |
+| 6 | 011001 | 14 | 011100 | 22 | 011010 | 30 | 011110 / 100001 |
+| 7 | 111000 / 000111 | 15 | 010111 / 101000 | 23 | 111010 / 000101 | 31 | 101011 / 010100 |
+
+K28 uses `001111 / 110000`. K23, K27, K29 and K30 use the 6-bit codes of
+D23, D27, D29 and D30.
+
+**3b/4b** (RD- form / RD+ form, by the RD after the 6-bit sub-block):
+
+| y | D.x.y | K.x.y |
+|---|---|---|
+| 0 | 1011 / 0100 | 1011 / 0100 |
+| 1 | 1001 | 0110 / 1001 |
+| 2 | 0101 | 1010 / 0101 |
+| 3 | 1100 / 0011 | 1100 / 0011 |
+| 4 | 1101 / 0010 | 1101 / 0010 |
+| 5 | 1010 | 0101 / 1010 |
+| 6 | 0110 | 1001 / 0110 |
+| 7 | 1110 / 0001 (primary), 0111 / 1000 (alternate) | 0111 / 1000 |
+
+D.x.7 uses the alternate form when the RD after the 6-bit sub-block is
+negative and x is 17, 18 or 20, or when it is positive and x is 11, 13 or
+14; otherwise the primary form. This keeps a run of five equal bits out of
+data.
+
+The twelve valid K symbols are K28.0-K28.7, K23.7, K27.7, K29.7 and K30.7.
+PCIe uses ten of them (section 1); K28.4 and K28.6 decode, and are then
+invalid K symbols to PCIe.
+
+**Known answers** (symbol, RD before, code, RD after). Computed from the
+tables above and checked against pcieVHost's encoder
+(`pcievhost/src/codec.c`, `Encode()`) for all 268 symbols at both
+disparities:
+
+| Symbol | RD- → code | RD+ → code |
+|---|---|---|
+| K28.5 COM | 0011111010 → + | 1100000101 → - |
+| K28.0 SKP | 0011110100 → - | 1100001011 → + |
+| K28.1 FTS | 0011111001 → + | 1100000110 → - |
+| K28.2 SDP | 0011110101 → + | 1100001010 → - |
+| K28.3 IDL | 0011110011 → + | 1100001100 → - |
+| K28.7 EIE | 0011111000 → - | 1100000111 → + |
+| K23.7 PAD | 1110101000 → - | 0001010111 → + |
+| K27.7 STP | 1101101000 → - | 0010010111 → + |
+| K29.7 END | 1011101000 → - | 0100010111 → + |
+| K30.7 EDB | 0111101000 → - | 1000010111 → + |
+| D0.0 | 1001110100 → - | 0110001011 → + |
+| D10.2 TS1 id | 0101010101 → - | 0101010101 → + |
+| D5.2 TS2 id | 1010010101 → - | 1010010101 → + |
+| D21.5 | 1010101010 → - | 1010101010 → + |
+| D7.7 | 1110001110 → + | 0001110001 → - |
+| D17.7 | 1000110111 → + | 1000110001 → - |
+| D11.7 | 1101001110 → + | 1101001000 → - |
+
+**The comma.** `0011111` and `1100000` occur in valid 8b/10b only inside
+K28.1, K28.5 and K28.7 (and across a K28.7 followed by certain symbols), so
+a receiver aligns symbol boundaries on them. PCIe receivers align on COM
+(K28.5); its two forms are the first two rows above.
+
+**Polarity.** An inverted differential pair delivers every bit inverted.
+COM inverts into COM of the other disparity, so alignment still works, but
+data does not: D10.2 inverts to D21.5, which is how a receiver notices
+(TS1 identifier 0x4A arriving as 0xB5).
+
+**Line rates.** 2.5 GT/s (Gen1): one bit every 400 ps. 5.0 GT/s (Gen2):
+200 ps. A waveform needs a timescale of 100 ps or finer for Gen2 bits to
+land on whole ticks; 1 ps or 10 ps is normal for SerDes models.

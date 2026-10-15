@@ -6,6 +6,16 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 
 ## [Unreleased]
 
+### Added
+
+- PCIe serial line decoders (`ferrite.pcie_serial`, `ferrite.pcie_serial_dll`,
+  `SPEC.md` §11): decode an x1 Gen1/Gen2 link from the 1-bit serial line of
+  a SerDes model. Bit recovery from transition times, per-burst rate
+  detection (`rate` = `auto`, `gen1`, `gen2`), COM alignment with
+  realignment, 8b/10b decoding with code and disparity errors, electrical
+  idle (X/Z or a constant level for more than 8 ns), `invert`, and then the
+  PIPE or Data Link Layer decoder's output on the recovered symbols.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

@@ -70,12 +70,14 @@ typedef enum pcie_trunc_by {
     PCIE_TRUNC_COM,
     PCIE_TRUNC_RXVALID,
     PCIE_TRUNC_TXELECIDLE,
+    PCIE_TRUNC_ELECIDLE,    // serial line: electrical idle (§11.3)
     PCIE_TRUNC_END_OF_TRACE // §10.6
 } pcie_trunc_by;
 
 typedef enum pcie_break_reason {
     PCIE_BREAK_RXVALID,    // rxvalid sampled 0 (SPEC.md §4.3)
     PCIE_BREAK_TXELECIDLE, // txelecidle sampled 1 (§4.3)
+    PCIE_BREAK_ELECIDLE,   // serial line went to electrical idle (§11.3): gating, by another name
     PCIE_BREAK_UNKNOWN,    // X or Z on data/datak (§4.4): an open packet is dropped silently
     PCIE_BREAK_FLUSH       // end of stream
 } pcie_break_reason;

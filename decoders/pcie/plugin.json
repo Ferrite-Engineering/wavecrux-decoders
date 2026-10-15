@@ -13,6 +13,8 @@
     {"id": "ferrite.pcie_dll_w8", "name": "PCIe Data Link Layer (8-bit)"},
     {"id": "ferrite.pcie_dll_w16", "name": "PCIe Data Link Layer (16-bit)"},
     {"id": "ferrite.pcie_dll_w32", "name": "PCIe Data Link Layer (32-bit)"},
-    {"id": "ferrite.pcie_dll_w64", "name": "PCIe Data Link Layer (64-bit)"}
+    {"id": "ferrite.pcie_dll_w64", "name": "PCIe Data Link Layer (64-bit)"},
+    {"id": "ferrite.pcie_serial", "name": "PCIe serial line (symbols)"},
+    {"id": "ferrite.pcie_serial_dll", "name": "PCIe serial line (Data Link Layer)"}
   ]
 }

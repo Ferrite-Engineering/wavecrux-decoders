@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Ferrite Engineering LLC
 #
-# wcx_pcie: the PCIe PIPE and Data Link Layer decoders (eight decoder ids,
-# one per PIPE data width and layer; see SPEC.md §1).
+# wcx_pcie: the PCIe PIPE, serial line and Data Link Layer decoders (ten
+# decoder ids; see SPEC.md §1).
 
 file(GLOB _pcie_unit_tests CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit_*.c")
 list(SORT _pcie_unit_tests)
@@ -10,7 +10,8 @@ list(SORT _pcie_unit_tests)
 wcx_add_decoder(
     NAME         pcie
     ID           ferrite.pcie_pipe_w16
-    SOURCES      src/pcie_crc.c
+    SOURCES      src/pcie_8b10b.c
+                 src/pcie_crc.c
                  src/pcie_scrambler.c
                  src/pcie_pipeline.c
                  src/pcie_sink.c
@@ -18,6 +19,8 @@ wcx_add_decoder(
                  src/pcie_pipe_fe.c
                  src/pcie_dll_fe.c
                  src/pcie_detector.c
+                 src/pcie_line.c
+                 src/pcie_serial_plugin.c
                  src/pcie_plugin.c
     INCLUDE_DIRS src
     UNIT_TESTS   ${_pcie_unit_tests}
