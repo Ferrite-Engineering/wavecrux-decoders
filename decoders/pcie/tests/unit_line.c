@@ -39,7 +39,7 @@ static size_t count(const evlog *log, pcie_line_event_kind kind) {
 // The which-th event of a kind, or an all-zero event when there are fewer
 // (never NULL; the tests check the counts first).
 static const pcie_line_event *nth(const evlog *log, pcie_line_event_kind kind, size_t which) {
-    static const pcie_line_event k_none;
+    static const pcie_line_event k_none = {0};
     for (size_t i = 0; i < log->n; i++) {
         if (log->ev[i].kind == kind && which-- == 0u) {
             return &log->ev[i];
