@@ -13,9 +13,9 @@ them and trust what they download.
 
 | Plugin | Decoders | Decodes | Status |
 |---|---|---|---|
-| [PCIe](decoders/pcie/) | **PCIe PIPE** (`ferrite.pcie_pipe_w8/16/32/64`) | PCI Express Gen1/Gen2 at the PIPE interface: training sets (TS1, TS2), SKP, FTS, electrical idle, TLP and DLLP framing, RxStatus, symbol errors | 0.1.0, preview |
-| | **PCIe Data Link Layer** (`ferrite.pcie_dll_w8/16/32/64`) | DLLPs (Ack, Nak, flow control, power management) with CRC-16 checks, TLPs with sequence tracking, replays and LCRC checks | 0.1.0, preview |
-| | **PCIe serial line** (`ferrite.pcie_serial`, `ferrite.pcie_serial_dll`) | Both views from the 1-bit serial line of a SerDes model: bit recovery, Gen1/Gen2 rate detection, symbol lock, 8b/10b and disparity errors, electrical idle | unreleased |
+| [PCIe](decoders/pcie/) | **PCIe PIPE** (`ferrite.pcie_pipe_w8/16/32/64`) | PCI Express Gen1/Gen2 at the PIPE interface: training sets (TS1, TS2), SKP, FTS, electrical idle, TLP and DLLP framing, RxStatus, symbol errors | 0.2.0, preview |
+| | **PCIe Data Link Layer** (`ferrite.pcie_dll_w8/16/32/64`) | DLLPs (Ack, Nak, flow control, power management) with CRC-16 checks, TLPs with sequence tracking, replays and LCRC checks | 0.2.0, preview |
+| | **PCIe serial line** (`ferrite.pcie_serial`, `ferrite.pcie_serial_dll`) | Both views from the 1-bit serial line of a SerDes model: bit recovery, Gen1/Gen2 rate detection, symbol lock, 8b/10b and disparity errors, electrical idle | 0.2.0, preview |
 
 Each decoder is registered once per PIPE data width (8, 16, 32 and 64 bits),
 because WaveCrux binds plugin signals at a fixed width. Both were written for
