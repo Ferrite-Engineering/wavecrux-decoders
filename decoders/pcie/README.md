@@ -64,13 +64,26 @@ these decoders expect; a hardware capture is scrambled, which `auto` detects.
 
 ### openPCIE
 
-The simulation PIPE is 16 bits wide. Bind the 16-bit decoders to
-`tb.dut.pcie_inst.serdes_front_i.u_pcie_ep` (`pclk`, `TxData`, `TxDataK`,
-`RxData`, `RxDataK`) or to the `ep_tx_data`/`ep_tx_datak` and
-`ep_rx_data`/`ep_rx_datak` registers with `pipe_clk`. The stock `DUMP_VCD`
-does not include the PIPE scope; add it to `$dumpvars` (for example
-`$dumpvars(1, dut.pcie_inst.serdes_front_i.u_pcie_ep);`). `rx_active` can be
-bound to `rxvalid` by hand.
+The simulation PIPE is 16 bits wide. `make run USRSIMOPTS="--define DUMP_VCD"`
+in `5.sim` dumps exactly the pins the decoders need, at the pcieVHost
+endpoint: bind the 16-bit decoders to `tb.dut.u_pcie.u_phy_top.u_pcie_ep`
+(`pclk`, `TxData`, `TxDataK` for one direction, `RxData`, `RxDataK` for the
+other), and `tb.dut.u_pcie.u_phy_top.rx_active` to `rxvalid` by hand. The
+ready-made sessions `5.sim/tb.TLP-DLL-PIPE.wavecrux` and
+`5.sim/tb.PIPE-DLL.wavecrux` open that file with the decoders bound.
+
+### Dump only the pins you bind
+
+Dumping a whole PIPE PHY scope also records its fast internal clocks and
+shift registers. In openPCIE that made `tb.vcd` four times larger (about
+40 MB instead of 15 MB) for the same decode. Dump the bound signals by name
+instead, keeping the scope so auto-bind still finds them, for example:
+
+```verilog
+$dumpvars(0, tb.dut.phy.pclk);
+$dumpvars(0, tb.dut.phy.RxData);
+$dumpvars(0, tb.dut.phy.RxDataK);
+```
 
 ## Parameters
 
