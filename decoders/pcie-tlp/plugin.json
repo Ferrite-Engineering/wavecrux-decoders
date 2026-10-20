@@ -1,0 +1,12 @@
+{
+  "name": "PCIe TLP decoder (openPCIE)",
+  "library": "wcx_pcie_tlp",
+  "abi_major": 1,
+  "min_wavecrux": "1.0.1",
+  "license": "Apache-2.0",
+  "maintainer": "Chili.CHIPS",
+  "decoders": [
+    {"id": "openpcie.pcie_tlp_down", "name": "TLP Downstream"},
+    {"id": "openpcie.pcie_tlp_up", "name": "TLP Upstream"}
+  ]
+}

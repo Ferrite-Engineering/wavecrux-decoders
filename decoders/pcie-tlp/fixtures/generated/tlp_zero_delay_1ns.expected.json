@@ -1,0 +1,4 @@
+[
+{"startTime":28000,"endTime":44000,"label":"CfgRd BAR0","isError":false,"fields":{"type":"CfgRd0","fmt":"0","type_code":"0x04","length":"1","dw_count":"3","header":"04000001 0000010F 01000010","bus":"1","device":"0","function":"0","register":"0x010","register_name":"BAR0","requester":"00:00.0","tag":"1","first_be":"0xF"}},
+{"startTime":52000,"endTime":76000,"label":"MWr32 0x80000000 = 0x0000ABCD","isError":false,"fields":{"type":"MWr32","fmt":"2","type_code":"0x00","length":"1","dw_count":"4","header":"40000001 000000FF 80000000","address":"0x80000000","length_dw":"1","requester":"00:00.0","tag":"0","first_be":"0xF","last_be":"0xF","data":"0x0000ABCD"}}
+]
