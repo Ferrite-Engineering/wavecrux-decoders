@@ -166,6 +166,35 @@ stops on a held level is lost. With a lot of jitter on a Gen1 line, set
 - Scaled flow control (Gen4+) and the newer DLLP types (MR_Init,
   Data_Link_Feature, NOP) are reported as reserved.
 
+## Checking a decode without WaveCrux
+
+The release archive carries `tools/wcxhost` (`tools/wcxhost.exe` on
+Windows), which runs these decoders over a VCD from the command line, for a
+check in CI. With a bindings file naming the signals as in [Signals](#signals)
+(here for openPCIE's 16-bit PIPE, transmit side):
+
+```json
+{
+  "decoder": "ferrite.pcie_dll_w16",
+  "signal_bindings": {
+    "pclk": "tb.dut.u_pcie.u_phy_top.u_pcie_ep.pclk",
+    "data": "tb.dut.u_pcie.u_phy_top.u_pcie_ep.TxData",
+    "datak": "tb.dut.u_pcie.u_phy_top.u_pcie_ep.TxDataK"
+  }
+}
+```
+
+run, from the folder you unpacked the archive into (macOS shown; the library
+is `libwcx_pcie.so` on Linux and `wcx_pcie.dll` on Windows):
+
+```
+tools/wcxhost --plugin ./libwcx_pcie.dylib --vcd tb.vcd --bindings tx.bindings.json --sort
+```
+
+Add `--check expected.json` to compare with a list you have checked by hand;
+the exit status is 1 at the first difference. `tools/README.md` in the
+archive has the rest.
+
 ## Building and testing
 
 ```

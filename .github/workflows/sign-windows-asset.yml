@@ -4,8 +4,9 @@
 # Sign the Windows library of an already-published release, without
 # rebuilding it: for a release that was cut before the repository's signing
 # secrets existed. Downloads the release's Windows archive, signs the DLL
-# with Azure Trusted Signing (the account that signs WaveCrux), verifies the
-# Authenticode signature, repackages it with tools/release.py and uploads the
+# (and tools/wcxhost.exe, in archives that carry it) with Azure Trusted
+# Signing (the account that signs WaveCrux), verifies the Authenticode
+# signatures, repackages it with tools/release.py and uploads the
 # archive as a workflow artifact. A maintainer then regenerates SHA256SUMS
 # and catalog.json (tools/release.py finalize) and replaces the three release
 # assets. New releases sign in release.yml and never need this.
@@ -46,6 +47,7 @@ jobs:
           mkdir -p to-sign
           unzip -q "released/wcx-$plugin-$version-windows-x64.zip" -d unpacked
           cp "unpacked/wcx_$plugin.dll" to-sign/
+          if [ -f unpacked/tools/wcxhost.exe ]; then cp unpacked/tools/wcxhost.exe to-sign/; fi
 
       - name: Sign (Azure Trusted Signing)
         uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
@@ -57,20 +59,21 @@ jobs:
           trusted-signing-account-name: ${{ vars.AZURE_TS_ACCOUNT }}
           certificate-profile-name: ${{ vars.AZURE_TS_PROFILE }}
           files-folder: to-sign
-          files-folder-filter: dll
+          files-folder-filter: dll,exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Verify the signature
+      - name: Verify the signatures
         shell: pwsh
         run: |
-          $dll = Get-ChildItem to-sign -Filter *.dll | Select-Object -First 1
-          $sig = Get-AuthenticodeSignature $dll.FullName
-          "Status: $($sig.Status)"
-          "Signer: $($sig.SignerCertificate.Subject)"
-          "Timestamp: $($sig.TimeStamperCertificate.Subject)"
-          if ($sig.Status -ne 'Valid') { throw "signature is $($sig.Status)" }
+          foreach ($file in Get-ChildItem to-sign -Include *.dll, *.exe -Recurse) {
+            $sig = Get-AuthenticodeSignature $file.FullName
+            "$($file.Name): $($sig.Status)"
+            "  Signer: $($sig.SignerCertificate.Subject)"
+            "  Timestamp: $($sig.TimeStamperCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') { throw "$($file.Name): signature is $($sig.Status)" }
+          }
 
       - name: Repackage
         shell: bash

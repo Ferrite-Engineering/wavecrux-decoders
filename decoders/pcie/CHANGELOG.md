@@ -6,6 +6,13 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 
 ## [Unreleased]
 
+### Added
+
+- Each release archive now carries `tools/wcxhost` (`tools/wcxhost.exe` on
+  Windows), the host emulator, signed like the library: it runs these
+  decoders over a VCD without WaveCrux, for a check in CI. See
+  `tools/README.md` in the archive.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

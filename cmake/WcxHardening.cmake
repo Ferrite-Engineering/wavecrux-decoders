@@ -294,8 +294,8 @@ endmacro()
 
 # wcx_split_debug_info(<target>)
 #
-# With WCX_SPLIT_DEBUG=ON, moves a linked plugin's debug info into a
-# separate file next to it: <lib>.dSYM on macOS, <lib>.debug (with a
+# With WCX_SPLIT_DEBUG=ON, moves the debug info of a linked plugin (or of
+# wcxhost, which ships with it) into a separate file next to it: <lib>.dSYM on macOS, <lib>.debug (with a
 # .gnu_debuglink) on Linux. MSVC already writes a .pdb.
 function(wcx_split_debug_info target)
     if(NOT WCX_SPLIT_DEBUG)

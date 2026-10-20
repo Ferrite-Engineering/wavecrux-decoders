@@ -7,6 +7,10 @@
 # and is packaged; then one job checksums everything, writes the catalog
 # entry and creates the GitHub Release.
 #
+# Each archive ships the plugin library and wcxhost, the host emulator, from
+# the same build: both are signed (and on macOS notarized) together, and on
+# Linux both are held to the glibc floor.
+#
 # Signing uses the same secret and variable names as WaveCrux's own desktop
 # release. If any platform could not be signed because its signing secrets are
 # not configured, the release is created as a DRAFT: an unsigned macOS library
@@ -20,11 +24,18 @@ on:
     tags: ["*-v[0-9]*"]
   # Dry run: build, test, sign and notarize an existing tag on all three
   # platforms and keep the archives as workflow artifacts. Publishes nothing.
+  # `ref` builds another commit under that tag's name instead, to try a change
+  # to the release tooling (this workflow, tools/, CMake) before it is merged;
+  # the tag names the plugin, and that commit's VERSION must still match it.
   workflow_dispatch:
     inputs:
       tag:
         description: "Existing release tag to dry-run, e.g. pcie-v0.1.0"
         required: true
+        type: string
+      ref:
+        description: "Optional: branch or commit to build instead of the tag's source"
+        required: false
         type: string
 
 permissions:
@@ -58,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
 
       - name: Plugin from the tag
         id: tag
@@ -95,9 +106,12 @@ jobs:
       - name: Test (the full suite gates the release)
         run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
-      - name: glibc floor
+      - name: glibc floor (plugin and wcxhost)
         if: runner.os == 'Linux'
-        run: python3 tools/check_glibc.py --max 2.35 $(find build/${{ matrix.preset }} -name 'libwcx_${{ steps.tag.outputs.plugin }}.so')
+        run: |
+          python3 tools/check_glibc.py --max 2.35 \
+            build/${{ matrix.preset }}/plugins/libwcx_${{ steps.tag.outputs.plugin }}.so \
+            build/${{ matrix.preset }}/bin/wcxhost
 
       # ── macOS: Developer ID, hardened runtime, notarization ──────────────
       - name: Sign (macOS)
@@ -110,6 +124,7 @@ jobs:
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
           lib=$(find build/${{ matrix.preset }} -name 'libwcx_${{ steps.tag.outputs.plugin }}.dylib' -not -path '*.dSYM/*')
+          host=build/${{ matrix.preset }}/bin/wcxhost
           if [ -z "$MACOS_CERT_P12_BASE64" ]; then
             echo "::warning::macOS signing secrets are not configured; the release will be a draft"
             echo "signed=false" >> "$GITHUB_OUTPUT"
@@ -124,25 +139,50 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
           security list-keychains -d user -s "$keychain"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$keychain" > /dev/null
-          codesign --force --timestamp --options runtime \
-            --sign "Developer ID Application: Ferrite Engineering LLC (7957R7M965)" "$lib"
+          identity="Developer ID Application: Ferrite Engineering LLC (7957R7M965)"
+          codesign --force --timestamp --options runtime --sign "$identity" "$lib"
+          # wcxhost exists to load plugins, including ones a user builds
+          # (ad-hoc signed), so its hardened runtime turns library validation
+          # off. Nothing else is relaxed.
+          entitlements="$RUNNER_TEMP/wcxhost.entitlements"
+          cat > "$entitlements" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.cs.disable-library-validation</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+          codesign --force --timestamp --options runtime --entitlements "$entitlements" \
+            --sign "$identity" "$host"
           codesign --verify --strict --verbose=2 "$lib"
-          ditto -c -k --keepParent "$lib" "$RUNNER_TEMP/notarize.zip"
+          codesign --verify --strict --verbose=2 "$host"
+          # One submission for both binaries.
+          mkdir "$RUNNER_TEMP/notarize"
+          cp "$lib" "$host" "$RUNNER_TEMP/notarize/"
+          ditto -c -k --keepParent "$RUNNER_TEMP/notarize" "$RUNNER_TEMP/notarize.zip"
           out=$(xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$NOTARY_APPLE_ID" \
             --team-id 7957R7M965 --password "$NOTARY_PASSWORD" --wait 2>&1) || true
           echo "$out"
           # Check the outcome, not the exit code: an Invalid submission is a
           # completed submission.
           echo "$out" | grep -q "status: Accepted" || { echo "::error::notarization was not accepted"; exit 1; }
+          # A bare Mach-O file cannot have a ticket stapled; Gatekeeper looks
+          # the ticket up online. Show its verdict for the record.
+          spctl -a -vv -t open --context context:primary-signature "$lib" || true
+          spctl -a -vv -t open --context context:primary-signature "$host" || true
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       # ── Windows: Authenticode through Azure Trusted Signing ──────────────
-      - name: Stage DLL for signing (Windows)
+      - name: Stage DLL and wcxhost.exe for signing (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
           mkdir -p to-sign
           cp "$(find build/${{ matrix.preset }} -name 'wcx_${{ steps.tag.outputs.plugin }}.dll')" to-sign/
+          cp build/${{ matrix.preset }}/bin/wcxhost.exe to-sign/
       - name: Sign (Windows)
         if: runner.os == 'Windows' && vars.AZURE_TS_ENDPOINT != ''
         uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
@@ -154,10 +194,33 @@ jobs:
           trusted-signing-account-name: ${{ vars.AZURE_TS_ACCOUNT }}
           certificate-profile-name: ${{ vars.AZURE_TS_PROFILE }}
           files-folder: to-sign
-          files-folder-filter: dll
+          files-folder-filter: dll,exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+      - name: Verify the signatures (Windows)
+        if: runner.os == 'Windows' && vars.AZURE_TS_ENDPOINT != ''
+        shell: pwsh
+        run: |
+          foreach ($file in Get-ChildItem to-sign -Include *.dll, *.exe -Recurse) {
+            $sig = Get-AuthenticodeSignature $file.FullName
+            "$($file.Name): $($sig.Status), signer $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') { throw "$($file.Name): signature is $($sig.Status)" }
+          }
+
+      # The binaries that ship, after signing: wcxhost loads the plugin, and
+      # (on macOS, through its entitlement) a plugin signed by someone else.
+      - name: Smoke-test the shipped wcxhost
+        shell: bash
+        run: |
+          build="build/${{ matrix.preset }}"
+          case "$RUNNER_OS" in
+            Windows) host=to-sign/wcxhost.exe; lib="to-sign/wcx_${{ steps.tag.outputs.plugin }}.dll"; echo_lib="$build/plugins/wcx_test_echo.dll" ;;
+            macOS)   host="$build/bin/wcxhost"; lib="$build/plugins/libwcx_${{ steps.tag.outputs.plugin }}.dylib"; echo_lib="$build/plugins/libwcx_test_echo.dylib" ;;
+            *)       host="$build/bin/wcxhost"; lib="$build/plugins/libwcx_${{ steps.tag.outputs.plugin }}.so"; echo_lib="$build/plugins/libwcx_test_echo.so" ;;
+          esac
+          "$host" --plugin "$lib" --list
+          "$host" --plugin "$echo_lib" --list
 
       - name: Package
         shell: bash

@@ -8,10 +8,12 @@ Operations standard §4 and §5. Two steps, both run by the release workflow:
   release.py package  --plugin pcie --platform linux_x64 --build-dir build/ci-linux-gcc --out dist
   release.py finalize --plugin pcie --tag pcie-v0.1.0 --dist dist --repo Ferrite-Engineering/wavecrux-decoders
 
-`package` zips one platform's library with LICENSE, NOTICE and the plugin's
-README. `finalize` checks the tag against decoders/<plugin>/VERSION, writes
-SHA256SUMS, extracts the version's CHANGELOG section as release notes, and
-writes catalog.json from decoders/<plugin>/plugin.json and the archives.
+`package` zips one platform's library with LICENSE, NOTICE, the plugin's
+README and the host emulator built from the same commit (tools/wcxhost, with
+its README), so a decode can be checked without WaveCrux, in CI for example.
+`finalize` checks the tag against decoders/<plugin>/VERSION, writes SHA256SUMS,
+extracts the version's CHANGELOG section as release notes, and writes
+catalog.json from decoders/<plugin>/plugin.json and the archives.
 Standard library only, so it runs unchanged on every CI runner.
 """
 
@@ -20,15 +22,17 @@ import hashlib
 import json
 import pathlib
 import re
+import stat
 import sys
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# platform: (library file name, archive suffix, wcxhost file name)
 PLATFORMS = {
-    "linux_x64": ("lib{name}.so", "linux-x64"),
-    "macos_universal": ("lib{name}.dylib", "macos-universal"),
-    "windows_x64": ("{name}.dll", "windows-x64"),
+    "linux_x64": ("lib{name}.so", "linux-x64", "wcxhost"),
+    "macos_universal": ("lib{name}.dylib", "macos-universal", "wcxhost"),
+    "windows_x64": ("{name}.dll", "windows-x64", "wcxhost.exe"),
 }
 
 
@@ -50,9 +54,9 @@ def archive_name(plugin: str, version: str, platform: str) -> str:
     return f"wcx-{plugin}-{version}-{PLATFORMS[platform][1]}.zip"
 
 
-def find_library(build_dir: pathlib.Path, filename: str) -> pathlib.Path:
-    # A macOS release build keeps debug symbols in <lib>.dSYM, whose DWARF
-    # file has the library's own name; it is not the library to ship.
+def find_built(build_dir: pathlib.Path, filename: str) -> pathlib.Path:
+    # A macOS release build keeps debug symbols in <name>.dSYM, whose DWARF
+    # file has the binary's own name; it is not the binary to ship.
     matches = sorted(
         p for p in build_dir.rglob(filename)
         if p.is_file() and not any(part.endswith(".dSYM") for part in p.parts)
@@ -65,21 +69,30 @@ def find_library(build_dir: pathlib.Path, filename: str) -> pathlib.Path:
 def cmd_package(args: argparse.Namespace) -> int:
     meta = json.loads((plugin_dir(args.plugin) / "plugin.json").read_text(encoding="utf-8"))
     version = read_version(args.plugin)
-    library = find_library(args.build_dir, PLATFORMS[args.platform][0].format(name=meta["library"]))
+    lib_name, _, host_name = PLATFORMS[args.platform]
+    library = find_built(args.build_dir, lib_name.format(name=meta["library"]))
+    host = find_built(args.build_dir, host_name)
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / archive_name(args.plugin, version, args.platform)
     # Fixed timestamps and order, so the archive is reproducible given the
-    # same library bytes.
+    # same binaries. The library stays at the top level, where WaveCrux looks
+    # for it; wcxhost goes in tools/, which WaveCrux does not scan.
     members = [
-        (library, library.name),
-        (ROOT / "LICENSE", "LICENSE"),
-        (ROOT / "NOTICE", "NOTICE"),
-        (plugin_dir(args.plugin) / "README.md", "README.md"),
+        (library, library.name, 0o644),
+        (ROOT / "LICENSE", "LICENSE", 0o644),
+        (ROOT / "NOTICE", "NOTICE", 0o644),
+        (plugin_dir(args.plugin) / "README.md", "README.md", 0o644),
+        (host, f"tools/{host_name}", 0o755),
+        (ROOT / "tools" / "wcxhost" / "README.md", "tools/README.md", 0o644),
     ]
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for source, arcname in members:
+        for source, arcname, mode in members:
             info = zipfile.ZipInfo(arcname, date_time=(2026, 1, 1, 0, 0, 0))
-            info.external_attr = 0o644 << 16
+            # Unix permissions, whichever runner writes the archive: unzip
+            # honours them only when the entry says it was made on Unix, and
+            # wcxhost must unpack executable.
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | mode) << 16
             info.compress_type = zipfile.ZIP_DEFLATED
             zf.writestr(info, source.read_bytes())
     print(target)
@@ -130,7 +143,10 @@ def cmd_finalize(args: argparse.Namespace) -> int:
     notes = changelog_section(args.plugin, version)
     notes += (
         f"\n\nRequires WaveCrux {meta['min_wavecrux']} or later. Check downloads "
-        "against `SHA256SUMS`; installation steps are in the README inside each archive.\n"
+        "against `SHA256SUMS`; installation steps are in the README inside each archive.\n\n"
+        "Each archive also carries `tools/wcxhost`, the host emulator, which runs the "
+        "decoders over a VCD without WaveCrux (for a check in CI, say); see "
+        "`tools/README.md` in the archive.\n"
     )
     (args.dist / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
 

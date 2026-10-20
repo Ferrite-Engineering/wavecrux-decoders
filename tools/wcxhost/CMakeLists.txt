@@ -19,6 +19,9 @@ target_link_libraries(wcxhost_core PUBLIC wcx_common wcx_fuzz_driver ${CMAKE_DL_
 
 add_executable(wcxhost src/main.c)
 target_link_libraries(wcxhost PRIVATE wcxhost_core)
+# Every release archive ships wcxhost next to the plugin (operations
+# standard §4), so a release build strips it the same way as a plugin.
+wcx_split_debug_info(wcxhost)
 
 # MSVC's /analyze (PREfast) is for code we ship: plugins and common/. wcxhost
 # is test tooling, and PREfast reports C6001/C6386 on its realloc-grown

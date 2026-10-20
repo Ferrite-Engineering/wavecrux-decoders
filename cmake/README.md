@@ -224,7 +224,7 @@ Copy any `crash-*` it writes into `fuzz/regressions/` with the fix.
 | `WCX_SANITIZE` | empty | sanitizer list for `-fsanitize=` (MSVC: `address` only) |
 | `WCX_COVERAGE` | OFF | `-fprofile-instr-generate -fcoverage-mapping` (clang) |
 | `WCX_FUZZ` | OFF | `-fsanitize=fuzzer-no-link` everywhere, fuzz executables, implies address,undefined |
-| `WCX_SPLIT_DEBUG` | OFF (`release`: ON) | strip debug info from plugins into a sibling file |
+| `WCX_SPLIT_DEBUG` | OFF (`release`: ON) | strip debug info from plugins and `wcxhost` into a sibling file |
 
 Flags are probed with `-Werror` (and release flags at `-O2`), so a flag the
 compiler accepts but ignores counts as unsupported. Two documented
