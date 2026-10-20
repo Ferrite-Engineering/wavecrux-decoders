@@ -3,6 +3,7 @@
 
 *                       @martin-robert-fink
 /decoders/pcie/         @martin-robert-fink
+/decoders/pcie-tlp/     @chili-chips-ba @martin-robert-fink
 /common/                @martin-robert-fink
 /cmake/                 @martin-robert-fink
 /include/               @martin-robert-fink
