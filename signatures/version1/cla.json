@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "chili-chips-ba",
+      "id": 67533663,
+      "comment_id": 6304367825,
+      "created_at": "2026-10-20T23:46:58Z",
+      "repoId": 1409605659,
+      "pullRequestNo": 13
+    }
+  ]
 }
