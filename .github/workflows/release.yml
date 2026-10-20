@@ -71,14 +71,25 @@ jobs:
         with:
           ref: ${{ inputs.ref || inputs.tag || github.ref }}
 
+      # The tag names the plugin directory (decoders/pcie-tlp for
+      # pcie-tlp-v0.1.0); the library's file name comes from its plugin.json
+      # (`library`: wcx_pcie_tlp), never from the tag.
       - name: Plugin from the tag
         id: tag
         shell: bash
         run: |
           tag="${RELEASE_TAG}"
           plugin="${tag%-v*}"
-          [ -d "decoders/$plugin" ] || { echo "::error::no decoders/$plugin for tag $tag"; exit 1; }
+          [ -f "decoders/$plugin/plugin.json" ] || { echo "::error::no decoders/$plugin/plugin.json for tag $tag"; exit 1; }
+          library=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["library"])' "decoders/$plugin/plugin.json")
+          [[ "$library" =~ ^wcx_[a-z0-9_]+$ ]] || { echo "::error::decoders/$plugin/plugin.json: library '$library' is not wcx_<lower_snake_case>"; exit 1; }
+          case "$RUNNER_OS" in
+            Windows) lib_file="$library.dll" ;;
+            macOS)   lib_file="lib$library.dylib" ;;
+            *)       lib_file="lib$library.so" ;;
+          esac
           echo "plugin=$plugin" >> "$GITHUB_OUTPUT"
+          echo "lib_file=$lib_file" >> "$GITHUB_OUTPUT"
 
       - name: Toolchain (Linux)
         if: runner.os == 'Linux'
@@ -105,12 +116,17 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Test (the full suite gates the release)
         run: ctest --preset ${{ matrix.preset }} --output-on-failure
+      - name: The library plugin.json names was built
+        shell: bash
+        run: |
+          lib="build/${{ matrix.preset }}/plugins/${{ steps.tag.outputs.lib_file }}"
+          [ -f "$lib" ] || { echo "::error::$lib was not built; plugin.json 'library' must match wcx_add_decoder(NAME)"; exit 1; }
 
       - name: glibc floor (plugin and wcxhost)
         if: runner.os == 'Linux'
         run: |
           python3 tools/check_glibc.py --max 2.35 \
-            build/${{ matrix.preset }}/plugins/libwcx_${{ steps.tag.outputs.plugin }}.so \
+            build/${{ matrix.preset }}/plugins/${{ steps.tag.outputs.lib_file }} \
             build/${{ matrix.preset }}/bin/wcxhost
 
       # ── macOS: Developer ID, hardened runtime, notarization ──────────────
@@ -123,7 +139,7 @@ jobs:
           NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
-          lib=$(find build/${{ matrix.preset }} -name 'libwcx_${{ steps.tag.outputs.plugin }}.dylib' -not -path '*.dSYM/*')
+          lib=build/${{ matrix.preset }}/plugins/${{ steps.tag.outputs.lib_file }}
           host=build/${{ matrix.preset }}/bin/wcxhost
           if [ -z "$MACOS_CERT_P12_BASE64" ]; then
             echo "::warning::macOS signing secrets are not configured; the release will be a draft"
@@ -181,7 +197,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p to-sign
-          cp "$(find build/${{ matrix.preset }} -name 'wcx_${{ steps.tag.outputs.plugin }}.dll')" to-sign/
+          cp build/${{ matrix.preset }}/plugins/${{ steps.tag.outputs.lib_file }} to-sign/
           cp build/${{ matrix.preset }}/bin/wcxhost.exe to-sign/
       - name: Sign (Windows)
         if: runner.os == 'Windows' && vars.AZURE_TS_ENDPOINT != ''
@@ -214,10 +230,11 @@ jobs:
         shell: bash
         run: |
           build="build/${{ matrix.preset }}"
+          lib_file="${{ steps.tag.outputs.lib_file }}"
           case "$RUNNER_OS" in
-            Windows) host=to-sign/wcxhost.exe; lib="to-sign/wcx_${{ steps.tag.outputs.plugin }}.dll"; echo_lib="$build/plugins/wcx_test_echo.dll" ;;
-            macOS)   host="$build/bin/wcxhost"; lib="$build/plugins/libwcx_${{ steps.tag.outputs.plugin }}.dylib"; echo_lib="$build/plugins/libwcx_test_echo.dylib" ;;
-            *)       host="$build/bin/wcxhost"; lib="$build/plugins/libwcx_${{ steps.tag.outputs.plugin }}.so"; echo_lib="$build/plugins/libwcx_test_echo.so" ;;
+            Windows) host=to-sign/wcxhost.exe; lib="to-sign/$lib_file"; echo_lib="$build/plugins/wcx_test_echo.dll" ;;
+            macOS)   host="$build/bin/wcxhost"; lib="$build/plugins/$lib_file"; echo_lib="$build/plugins/libwcx_test_echo.dylib" ;;
+            *)       host="$build/bin/wcxhost"; lib="$build/plugins/$lib_file"; echo_lib="$build/plugins/libwcx_test_echo.so" ;;
           esac
           "$host" --plugin "$lib" --list
           "$host" --plugin "$echo_lib" --list

@@ -46,7 +46,9 @@ jobs:
             -p "wcx-$plugin-$version-windows-x64.zip" -D released
           mkdir -p to-sign
           unzip -q "released/wcx-$plugin-$version-windows-x64.zip" -d unpacked
-          cp "unpacked/wcx_$plugin.dll" to-sign/
+          # The DLL's name comes from plugin.json (pcie-tlp ships wcx_pcie_tlp.dll).
+          library=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["library"])' "decoders/$plugin/plugin.json")
+          cp "unpacked/$library.dll" to-sign/
           if [ -f unpacked/tools/wcxhost.exe ]; then cp unpacked/tools/wcxhost.exe to-sign/; fi
 
       - name: Sign (Azure Trusted Signing)
