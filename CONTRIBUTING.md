@@ -76,11 +76,19 @@ Ferrite Engineering the licence to distribute it, including under commercial
 licences. That is why it is a signature rather than a sign-off line. You keep
 your copyright.
 
-**To sign**, read [`CLA.md`](CLA.md) and write to
+**To sign**, open your pull request. A bot (the **CLA** check) comments with
+a link to [`CLA.md`](CLA.md) and the sentence to post; read the agreement,
+then comment on the pull request with exactly:
+
+    I have read the CLA Document and I hereby sign the CLA
+
+That records your acceptance (CLA.md section 2.1), once, for every later
+pull request too. If you contribute on behalf of your employer or another
+entity, accepting confirms you are authorised to bind it. Comment `recheck`
+to re-run the check. Questions go to
 [support@ferriteengineering.com](mailto:support@ferriteengineering.com) with
-`CLA` in the subject; we will send the signing instructions. If you
-contribute as part of your employment, say so and name the employer. Open the
-pull request whenever you like: the CLA gates the merge, not the review.
+`CLA` in the subject. Open the pull request whenever you like: the CLA gates
+the merge, not the review.
 
 ## Security
 
