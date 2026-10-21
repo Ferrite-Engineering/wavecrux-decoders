@@ -1,0 +1,9 @@
+{
+  "decoder": "ferrite.pcie_serial_dll",
+  "signal_bindings": {
+    "line": "tb.usp.txp"
+  },
+  "parameters": {
+    "rate": "auto"
+  }
+}

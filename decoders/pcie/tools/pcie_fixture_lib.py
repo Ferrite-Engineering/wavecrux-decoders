@@ -2056,16 +2056,55 @@ def write_serial_vcd(line: SerialLine, timescale: tuple[int, str], invert: bool,
     return "".join(out), ".".join(names.scope + (names.line,))
 
 
-def host_line_samples(text: str, fpt: int) -> list[tuple[int, str]]:
-    """The WaveCrux host for one bound 1-bit signal `!`: one sample per time
-    the VCD writes it, the final `#time` not fed. Times in fs."""
+def write_serial_link_vcd(lines: list[tuple[SerialLine, SerialNames]],
+                          timescale: tuple[int, str]) -> tuple[str, list[str]]:
+    """Both directions of a link in one VCD: (text, path of each line). The
+    first line gets the identifier `!`, the second `"`; each line has its
+    own scope. The trace ends after the later line's end."""
+    fpt = fs_per_tick(*timescale)
+    idents = ["!", '"']
+    assert len(lines) <= len(idents)
+    ev: dict[int, list] = {}
+    end_fs = 0
+    for (line, names), ident in zip(lines, idents):
+        assert line.changes and line.changes[0][0] == 0
+        assert names.complement is None and not names.redundant
+        for t, v in line.changes:
+            assert t % fpt == 0
+            ev.setdefault(t // fpt, []).append((ident, v))
+        end_fs = max(end_fs, line.end_fs)
+    end = end_fs // fpt
+    assert end_fs % fpt == 0 and max(ev) < end
+    out = ["$version wavecrux-decoders decoders/pcie/tools/generate_fixtures.py $end\n",
+           f"$timescale {timescale[0]}{timescale[1]} $end\n"]
+    for (_, names), ident in zip(lines, idents):
+        for sc in names.scope:
+            out.append(f"$scope module {sc} $end\n")
+        out.append(f"$var wire 1 {ident} {names.line} $end\n")
+        for _ in names.scope:
+            out.append("$upscope $end\n")
+    out.append("$enddefinitions $end\n")
+    for tick in sorted(ev):
+        out.append(f"#{tick}\n")
+        body = [f"{v}{i}\n" for i, v in ev[tick]]
+        if tick == 0:
+            out += ["$dumpvars\n"] + body + ["$end\n"]
+        else:
+            out += body
+    out.append(f"#{end}\n")
+    return "".join(out), [".".join(names.scope + (names.line,)) for _, names in lines]
+
+
+def host_line_samples(text: str, fpt: int, ident: str = "!") -> list[tuple[int, str]]:
+    """The WaveCrux host for one bound 1-bit signal `ident`: one sample per
+    time the VCD writes it, the final `#time` not fed. Times in fs."""
     samples: list[tuple[int, str]] = []
     t = None
     body = text.split("$enddefinitions $end\n", 1)[1]
     for ln in body.splitlines():
         if ln.startswith("#"):
             t = int(ln[1:])
-        elif ln.endswith("!") and len(ln) == 2:
+        elif len(ln) == 2 and ln[1] == ident:
             if samples and samples[-1][0] == t * fpt:
                 samples[-1] = (t * fpt, ln[0])
             else:

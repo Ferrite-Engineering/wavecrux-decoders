@@ -1,0 +1,15 @@
+[
+{"startTime":134080,"endTime":137280,"label":"InitFC1-P VC0 H=32 D=256","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"256","crc":"0x4B75"}},
+{"startTime":134080,"endTime":137280,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
+{"startTime":137280,"endTime":140480,"label":"InitFC1-NP VC0 H=32 D=0","isError":false,"fields":{"type":"initfc1_np","vc":"0","hdr_fc":"32","data_fc":"0","crc":"0x10ED"}},
+{"startTime":140480,"endTime":143680,"label":"InitFC1-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc1_cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xD892"}},
+{"startTime":143680,"endTime":146880,"label":"InitFC2-P VC0 H=32 D=256","isError":false,"fields":{"type":"initfc2_p","vc":"0","hdr_fc":"32","data_fc":"256","crc":"0x310A"}},
+{"startTime":146880,"endTime":150080,"label":"InitFC2-NP VC0 H=32 D=0","isError":false,"fields":{"type":"initfc2_np","vc":"0","hdr_fc":"32","data_fc":"0","crc":"0x6A92"}},
+{"startTime":150080,"endTime":153280,"label":"InitFC2-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc2_cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xA2ED"}},
+{"startTime":165280,"endTime":168480,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":272860,"endTime":274460,"label":"Ack seq=2","isError":false,"fields":{"type":"ack","seq":"2","crc":"0xF155"}},
+{"startTime":282060,"endTime":283660,"label":"Nak seq=2","isError":false,"fields":{"type":"nak","seq":"2","crc":"0x1A32"}},
+{"startTime":285660,"endTime":290460,"label":"TLP seq=0 CplD len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"CplD","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x9FC5D25B","replay":"false"}},
+{"startTime":291660,"endTime":293260,"label":"Ack seq=3","isError":false,"fields":{"type":"ack","seq":"3","crc":"0x504E"}},
+{"startTime":365260,"endTime":366860,"label":"Ack seq=4","isError":false,"fields":{"type":"ack","seq":"4","crc":"0x370C"}}
+]

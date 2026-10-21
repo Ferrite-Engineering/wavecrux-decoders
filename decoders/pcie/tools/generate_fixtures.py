@@ -1387,6 +1387,161 @@ def _(st: L.SerialStream) -> None:
     frame_errors(st)
 
 
+# ── both directions of one link (SPEC §11, two lines in one VCD) ─────────────
+
+@dataclass
+class LinkFixture:
+    """Two serial lines of one x1 link in one VCD, each decoded by both serial
+    decoders: four fixtures sharing the trace. A fixture binds one line; the
+    other line is in the file but never bound, as when a user decodes each
+    direction of a real dump with its own decoder instances."""
+    name: str            # <name>_<side>_<timescale>; serial_dll_<rest> for the DLL decoder
+    proves: str
+    build: object        # build(down, up)
+    timescale: tuple
+    params: dict
+    scrambled: bool
+    decoder: str = "ferrite.pcie_serial + ferrite.pcie_serial_dll"
+
+
+def link(name: str, proves: str, timescale: tuple, params: dict | None = None, scrambled: bool = False):
+    def wrap(fn):
+        FIXTURES.append(LinkFixture(name, proves, fn, timescale, params or {}, scrambled))
+        return fn
+    return wrap
+
+
+def in_step(down: L.SerialStream, up: L.SerialStream) -> None:
+    """Both lines have sent the same number of symbols, at the same rates,
+    after the same idle times: symbol k starts at the same time on both."""
+    assert down.pos() == up.pos(), (down.pos(), up.pos())
+
+
+# A Downstream Port and an Upstream Port bringing up an x1 link (scrambled, rate=auto,
+# scrambling=auto on every decoder): Polling.Active (TS1 PAD/PAD), Polling.Configuration
+# (TS2 PAD/PAD), Configuration (the Downstream Port proposes Link 0 with Lane PAD, the
+# Upstream Port answers PAD/PAD then echoes it; Lane 0; TS2 0/0), idle, InitFC1/InitFC2
+# for P, NP and Cpl, a TLP and its Ack at 2.5 GT/s; Recovery with speed_change set on
+# both sides (TS1/TS2 Data Rate 0x86), EIOS, 6 ns electrical idle, EIEOS and TS1/TS2 at
+# 5.0 GT/s; then TLPs both ways with a coalesced Ack, a Nak, a replay, an Ack 300 symbol
+# times after its TLP, and the Downstream Port entering L0s (EIOS, idle, FTS x4, SKP).
+# Symbol k is sent at the same time on both lines until the L0s, so the time between a
+# TLP on one line and an Ack on the other is a whole number of symbol times.
+@link("serial_link_x1_gen2", "both lines of an x1 link: training, speed change to Gen2, Acks, Nak, replay, L0s",
+      (10, "ps"), params={"rate": "auto"}, scrambled=True)
+def _(down: L.SerialStream, up: L.SerialStream) -> None:
+    both = (down, up)
+    for st in both:
+        st.lead(("x", 2 * NS))
+        st.burst("gen1", rd=-1, prelock=[PRE])
+    n_fts = {id(down): 24, id(up): 40}
+    for st in both:                                          # Polling.Active
+        st.ts("ts1", None, None, n_fts=n_fts[id(st)], rate=0x06, count=4)
+    for st in both:                                          # Polling.Configuration
+        st.ts("ts2", None, None, n_fts=n_fts[id(st)], rate=0x06, count=4)
+    down.ts("ts1", 0, None, n_fts=24, rate=0x06, count=4)    # Configuration.Linkwidth
+    up.ts("ts1", None, None, n_fts=40, rate=0x06, count=2)
+    up.ts("ts1", 0, None, n_fts=40, rate=0x06, count=2)
+    in_step(down, up)
+    down.ts("ts1", 0, 0, n_fts=24, rate=0x06, count=4)       # Configuration.Lanenum
+    up.ts("ts1", 0, None, n_fts=40, rate=0x06, count=2)
+    up.ts("ts1", 0, 0, n_fts=40, rate=0x06, count=2)
+    for st in both:                                          # Configuration.Complete, Idle
+        st.ts("ts2", 0, 0, n_fts=n_fts[id(st)], rate=0x06, count=4)
+        st.idle(6)
+        st.skp()
+        st.idle(2)
+        credits = {"p": (32, 256), "np": (32, 0), "cpl": (0, 0)}   # (header, data); Cpl infinite
+        for phase in ("initfc1", "initfc2"):
+            for fc in ("p", "np", "cpl"):
+                st.dllp(Dllp(f"{phase}_{fc}", hdr=credits[fc][0], data=credits[fc][1]))
+    in_step(down, up)
+    # L0 at 2.5 GT/s: TLP 0 down, Ack 0 up six symbol times after its END.
+    down.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=201))     # 24 symbols
+    down.idle(40)
+    up.idle(30)
+    up.dllp(Dllp("ack", seq=0))
+    up.idle(26)
+    in_step(down, up)
+    for st in both:                                          # Recovery, speed change requested
+        st.ts("ts1", 0, 0, n_fts=n_fts[id(st)], rate=0x86, count=4)
+        st.ts("ts2", 0, 0, n_fts=n_fts[id(st)], rate=0x86, count=4)
+        st.eios()
+        st.elec_idle(("x", 6 * NS))
+        st.burst("gen2", rd=1, prelock=[("data", bytes([0x00]), 1)], decide=1)
+        st.eieos(1)
+        st.ts("ts1", 0, 0, n_fts=n_fts[id(st)], rate=0x06, count=4)
+        st.ts("ts2", 0, 0, n_fts=n_fts[id(st)], rate=0x06, count=4)
+        st.idle(8)
+    in_step(down, up)
+    # L0 at 5.0 GT/s. Offsets from here, in symbols:
+    t3 = Tlp("MWr32", 3, length_dw=1, rng_seed=204)
+    down.tlp(Tlp("MWr32", 1, length_dw=1, rng_seed=202))     # 0..23
+    down.tlp(Tlp("MRd32", 2, rng_seed=203))                  # 24..43
+    down.idle(20)                                            # 44..63
+    down.tlp(t3)                                             # 64..87
+    down.idle(24)                                            # 88..111
+    down.tlp(t3)                                             # 112..135, the replay
+    down.idle(12)                                            # 136..147
+    down.dllp(Dllp("ack", seq=0))                            # 148..155
+    down.idle(20)                                            # 156..175
+    up.idle(50)                                              # 0..49
+    up.dllp(Dllp("ack", seq=2))                              # 50..57, covers 1 and 2
+    up.idle(38)                                              # 58..95
+    up.dllp(Dllp("nak", seq=2))                              # 96..103: 3 is to be replayed
+    up.idle(10)                                              # 104..113
+    up.tlp(Tlp("CplD", 0, length_dw=1, rng_seed=205))        # 114..137
+    up.idle(6)                                               # 138..143
+    up.dllp(Dllp("ack", seq=3))                              # 144..151, the replay
+    up.idle(24)                                              # 152..175
+    for st in both:
+        st.skp()                                             # 176..179
+        st.idle(8)                                           # 180..187
+    in_step(down, up)
+    down.tlp(Tlp("MWr32", 4, length_dw=1, rng_seed=206))     # 0..23
+    down.idle(320)                                           # 24..343
+    up.idle(324)                                             # 0..323
+    up.dllp(Dllp("ack", seq=4))                              # 324..331, 300 symbol times after END
+    up.idle(12)                                              # 332..343
+    in_step(down, up)
+    down.eios()                                              # L0s
+    down.elec_idle(("x", 40 * NS))
+    down.burst("gen2", rd=1, prelock=[("data", bytes([0x00]), 1)], decide=1)
+    down.fts(4)
+    down.skp()
+    down.idle(4)
+    down.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    down.idle(4)
+    up.idle(40)
+    up.skp()
+    up.idle(20)
+
+
+def make_link(fx: LinkFixture) -> dict[str, str]:
+    down = L.SerialStream(scrambled=fx.scrambled)
+    up = L.SerialStream(scrambled=fx.scrambled)
+    fx.build(down, up)
+    fpt = L.fs_per_tick(*fx.timescale)
+    sides = []
+    for side, st in (("dsp", down), ("usp", up)):
+        st.finish()
+        sides.append((side, st, L.transmit(st, fpt), L.SerialNames(scope=("tb", side), line="txp")))
+    text, paths = L.write_serial_link_vcd([(ln, nm) for _, _, ln, nm in sides], fx.timescale)
+    files: dict[str, str] = {}
+    suffix = f"{fx.timescale[0]}{fx.timescale[1]}"
+    for (side, st, line, _), path, ident in zip(sides, paths, ("!", '"')):
+        samples = L.host_line_samples(text, fpt, ident)
+        dedup = [s for k, s in enumerate(samples) if k == 0 or s[1] != samples[k - 1][1]]
+        assert dedup == line.changes, f"{fx.name} {side}: host samples differ from the transmitted changes"
+        for decoder, prefix in (("ferrite.pcie_serial", "serial_"), ("ferrite.pcie_serial_dll", "serial_dll_")):
+            stem = f"{prefix}{fx.name.removeprefix('serial_')}_{side}_{suffix}"
+            txs = L.expected_serial(st, line, samples, decoder, fx.params)
+            files[f"{stem}.vcd"] = text
+            files[f"{stem}.bindings.json"] = L.bindings_json(decoder, {"line": path}, fx.params)
+            files[f"{stem}.expected.json"] = L.canonical(txs, fpt)
+    return files
+
+
 # ── generation ───────────────────────────────────────────────────────────────
 
 def make_serial(fx: SerialFixture) -> dict[str, str]:
@@ -1411,6 +1566,8 @@ def make_serial(fx: SerialFixture) -> dict[str, str]:
 def make(fx: Fixture) -> dict[str, str]:
     if isinstance(fx, SerialFixture):
         return make_serial(fx)
+    if isinstance(fx, LinkFixture):
+        return make_link(fx)
     st = Stream(fx.lanes, scrambled=fx.scrambled)
     fx.build(st)
     st.finish()

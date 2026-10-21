@@ -12,6 +12,11 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
   Windows), the host emulator, signed like the library: it runs these
   decoders over a VCD without WaveCrux, for a check in CI. See
   `tools/README.md` in the archive.
+- Fixtures for both directions of one x1 link in one VCD
+  (`serial_link_x1_gen2_*`, `serial_dll_link_x1_gen2_*`): training at
+  2.5 GT/s, a speed change to 5.0 GT/s, Acks, a Nak and its replay, and L0s,
+  each line through both serial decoders. Test data only; the decoders are
+  unchanged.
 
 ## [0.2.0] - 2026-10-15
 

@@ -109,6 +109,27 @@ changes:
    (`pcie_serial_dll`) engines' over the same units, timed by the recovered
    bit times; `auto` scrambling selection is the same code.
 
+### Both directions of one link
+
+`serial_link_x1_gen2_{dsp,usp}_10ps` and `serial_dll_link_x1_gen2_{dsp,usp}_10ps`
+are one x1 link: a Downstream Port line (`tb.dsp.txp`) and an Upstream Port
+line (`tb.usp.txp`) in the same VCD, written by `write_serial_link_vcd()`. Each
+of the four fixtures binds one line to one serial decoder; the other line is in
+the file and never bound, as when a user decodes each direction of a dump with
+its own decoder instances. The four `.vcd` files are the same trace.
+
+The two streams are built side by side and `in_step()` asserts, at each sync
+point, that both have sent the same number of symbols at the same rates after
+the same idle times, so symbol k starts at the same time on both lines. The
+traffic follows the link-training and Ack/Nak sequences of the PCI Express
+Base Specification (Polling, Configuration with the Downstream Port proposing
+the Link number, InitFC1/InitFC2, Recovery with a speed change to 5.0 GT/s,
+Acks covering several TLPs, a Nak and the replay it requests, L0s); the
+decoders' expectations come from the same engines as every other serial
+fixture. The comments in the builder give each packet's symbol offsets, so
+the time from a TLP on one line to an Ack on the other can be read off in
+symbol times.
+
 Readings the serial expectations take where §11 is silent:
 
 1. **`disparity_error`**: the name (`D12.3`) and `symbol` are the 8b/10b
