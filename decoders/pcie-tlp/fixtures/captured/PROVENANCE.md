@@ -20,6 +20,32 @@ Two fixtures share one trace, recorded from a real RTL simulation:
   the RTL's AXI-Stream in both directions, re-timed to one DW per clock by
   `5.sim/models/tlp_dw_monitor.sv`.
 
+## Expected entries: where they come from
+
+The 41 entries (21 down, 20 up) in the two `<stem>.expected.json` files
+come from SPEC.md and the raw trace values, never from the decoder's code or
+output:
+
+1. A reviewer who did not see the decoder's code (`src/`, `tests/`,
+   `fuzz/`) or run it wrote a model of SPEC.md, checked it byte for byte
+   against all hand-derived `fixtures/generated/*.expected.json`, and ran
+   it on the trace. That gave the committed files.
+2. A second reviewer, under the same rules and without seeing those files,
+   wrote `tools/derive_captured_expected.py`: it reads the VCD, decodes each
+   header per SPEC.md and the PCIe Base Specification, and imports nothing
+   of the decoder. Its output matches both files byte for byte:
+
+   ```
+   python3 decoders/pcie-tlp/tools/derive_captured_expected.py openpcie_rc_down_peer_1ps --out down.json
+   python3 decoders/pcie-tlp/tools/derive_captured_expected.py openpcie_rc_up_full_peer_1ps --out up.json
+   diff down.json decoders/pcie-tlp/fixtures/captured/openpcie_rc_down_peer_1ps.expected.json
+   diff up.json decoders/pcie-tlp/fixtures/captured/openpcie_rc_up_full_peer_1ps.expected.json
+   ```
+
+3. The three anchors below were checked by hand against the beats.
+
+The decoder was run on the fixtures only afterwards, as the test.
+
 ## Licence
 
 BSD-3-Clause, openPCIE's `LICENSE`, by its copyright holder Chili.CHIPS,
@@ -27,6 +53,41 @@ who also wrote this decoder. Only the simulation's output is copied here:
 signal values of our RTL, no source code of openPCIE or of the VIP. pcieVHost
 and VProc (GPL-3.0-or-later) drive the link in the simulation; none of their
 code or text is in the trace.
+
+The trace is redistributed under openPCIE's notice (`LICENSE` at commit
+`2318f2e`; its `REUSE.toml` gives `SPDX-FileCopyrightText: 2026
+CHILI.CHIPS.LLC`, `SPDX-License-Identifier: BSD-3-Clause`):
+
+```
+BSD 3-Clause License
+
+Copyright (c) 2026, Chili.CHIPS
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
 
 ## Simulator: Vivado xsim, not an open simulator
 

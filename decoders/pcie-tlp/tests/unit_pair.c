@@ -61,6 +61,23 @@ WCX_TEST(a_fifth_requester_replaces_the_oldest) {
     free(p);
 }
 
+WCX_TEST(eviction_is_oldest_first_after_a_take) {
+    tlp_pairs *p = calloc(1, sizeof *p);
+    WCX_REQUIRE(p != NULL);
+    for (uint32_t req = 1u; req <= 5u; req++) { // 5 replaces 1
+        note_cfgrd(p, req);
+    }
+    WCX_CHECK(take_cpl(p, 2u).kind == TLP_MATCH_CFG_READ); // frees 2's way
+    note_cfgrd(p, 6u);                                     // takes it: 3, 4, 5, 6
+    note_cfgrd(p, 3u);                                     // reuse: 3 keeps its place
+    note_cfgrd(p, 7u);                                     // replaces 3, the oldest
+    WCX_CHECK(take_cpl(p, 3u).kind == TLP_MATCH_NONE);
+    for (uint32_t req = 4u; req <= 7u; req++) {
+        WCX_CHECK(take_cpl(p, req).kind == TLP_MATCH_CFG_READ);
+    }
+    free(p);
+}
+
 WCX_TEST(split_completion_counts_the_lower_address) {
     tlp_pairs *p = calloc(1, sizeof *p);
     WCX_REQUIRE(p != NULL);
@@ -118,6 +135,7 @@ int main(void) {
     WCX_RUN(&t, a_completion_takes_its_request_once);
     WCX_RUN(&t, two_requesters_share_a_tag);
     WCX_RUN(&t, a_fifth_requester_replaces_the_oldest);
+    WCX_RUN(&t, eviction_is_oldest_first_after_a_take);
     WCX_RUN(&t, split_completion_counts_the_lower_address);
     WCX_RUN(&t, byte_count_zero_keeps_a_4k_read);
     WCX_RUN(&t, ten_bit_tags_and_what_is_remembered);

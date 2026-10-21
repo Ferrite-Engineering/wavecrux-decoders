@@ -21,10 +21,12 @@ First release here, to become 0.1.0. The decoder comes from openPCIE
   shorter than their header give one error with `occurrences`, so a stuck
   or misbound `tlp_sop` no longer gives one error per clock.
 - Errors carry `type` `error`, an `error` sentence and `expected` /
-  `actual` where they apply.
+  `actual` where they apply. A UR or CA completion with a length mismatch
+  reports both.
 - Completions pair with a request by requester ID and 10-bit tag (was the
   8-bit tag alone): two requesters, or two functions, using one tag no
-  longer overwrite each other. A split completion keeps the request for the
+  longer overwrite each other. Up to 4 requesters per tag; a fifth replaces
+  the oldest. A split completion keeps the request for the
   parts that follow, counting the lower address of the first part.
 - A completion to an I/O request says `IORd` / `IOWr`.
 - TLP prefixes and reserved Type/Fmt combinations (a locked write; a 4 DW

@@ -107,6 +107,19 @@ WCX_TEST(locked_completion_abort_is_an_error) {
     wcx_arena_free(&a);
 }
 
+WCX_TEST(ur_completion_with_a_length_mismatch_reports_both) {
+    wcx_arena a;
+    WCX_REQUIRE(wcx_arena_init(&a, 1024, 65536));
+    // CplD UR, Length 2, but 1 data DW: 4 DW received, 5 expected
+    const uint32_t cpl[] = {0x4A000002u, 0x01002008u, 0x00004500u, 0x00000000u};
+    const tlp_text r = fmt(&a, cpl, 4, NULL, false);
+    WCX_CHECK_STR_EQ(r.label, "CplD UR = 0x00000000  [4 DW, expected 5]");
+    WCX_CHECK(r.is_error);
+    WCX_CHECK(ends_with(r.fields, "\"error\":\"Unsupported Request; length does not match the "
+                                  "Length field\",\"expected\":5,\"actual\":4}"));
+    wcx_arena_free(&a);
+}
+
 WCX_TEST(locked_64_bit_read_and_prefix) {
     wcx_arena a;
     WCX_REQUIRE(wcx_arena_init(&a, 1024, 65536));
@@ -183,6 +196,7 @@ int main(void) {
     WCX_RUN(&t, compact_config_shows_bdf_unless_lone_endpoint);
     WCX_RUN(&t, completion_to_io_write);
     WCX_RUN(&t, locked_completion_abort_is_an_error);
+    WCX_RUN(&t, ur_completion_with_a_length_mismatch_reports_both);
     WCX_RUN(&t, locked_64_bit_read_and_prefix);
     return wcx_test_finish(&t);
 }

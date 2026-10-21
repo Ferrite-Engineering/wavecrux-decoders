@@ -336,7 +336,11 @@ static void add_errors(tlp_ctx *c, tlp_text *out) {
     const uint32_t exp = tlp_expected_dw(c->dw[0]);
     if (exp != 0u && exp != c->n) {
         c->label = wcx_arena_printf(c->a, "%s  [%u DW, expected %u]", c->label, c->n, exp);
-        wcx_json_add_str(c->j, "error", "length does not match the Length field");
+        const char *len_error = "length does not match the Length field";
+        wcx_json_add_str(c->j, "error",
+                         c->error != NULL
+                             ? ok(c, wcx_arena_printf(c->a, "%s; %s", c->error, len_error))
+                             : len_error); // a UR/CA completion reports both
         wcx_json_add_u64(c->j, "expected", exp);
         wcx_json_add_u64(c->j, "actual", c->n);
         out->is_error = true;

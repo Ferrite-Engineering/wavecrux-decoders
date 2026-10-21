@@ -47,8 +47,15 @@ void tlp_pair_note(tlp_pairs *p, const uint32_t *dw, uint32_t n) {
         }
     }
     if (slot == TLP_PAIR_WAYS) {
-        slot = p->next[tag];
-        p->next[tag] = (uint8_t)((slot + 1u) % TLP_PAIR_WAYS);
+        slot = 0; // all ways taken: replace the oldest
+        for (size_t w = 1; w < TLP_PAIR_WAYS; w++) {
+            if (ways[w].seq < ways[slot].seq) {
+                slot = w;
+            }
+        }
+    }
+    if (!ways[slot].valid || ways[slot].requester != requester) {
+        ways[slot].seq = ++p->seq; // a replaced request keeps its place
     }
     ways[slot].valid = true;
     ways[slot].requester = requester;

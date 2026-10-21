@@ -11,7 +11,8 @@
 # trimmed to the TLP traffic with MARGIN clock periods on each side. The
 # values at the window start become the $dumpvars block. The $date section,
 # the only part that changes between runs, is dropped. One trace serves both
-# fixtures. The <stem>.expected.json files are not written here.
+# fixtures. The <stem>.expected.json files are not written here: they come
+# from SPEC.md (PROVENANCE.md; derive_captured_expected.py reproduces them).
 
 import argparse
 import json
