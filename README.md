@@ -37,6 +37,21 @@ wrong time on most waveforms.)
 3. Open a waveform and add the decoder with **Ctrl+Shift+D** (⌘⇧D on macOS).
    Auto-bind fills in signals whose names match.
 
+## Checking a decode without WaveCrux
+
+Every release archive also carries `tools/wcxhost` (`tools/wcxhost.exe` on
+Windows), a command-line host that loads the plugin exactly as WaveCrux does
+and prints the decoded transactions as JSON, or compares them with a list you
+have checked, for a decode check in CI:
+
+```
+tools/wcxhost --plugin ./libwcx_pcie.so --vcd tb.vcd --bindings tb.bindings.json --sort --check expected.json
+```
+
+How to write the bindings file and the expected list is in
+[`tools/wcxhost/README.md`](tools/wcxhost/README.md), which ships in the
+archive as `tools/README.md`.
+
 ## Building from source
 
 CMake 3.25+, a C17 compiler (GCC 12+, Clang 15+, MSVC 2022), Python 3.10+ for

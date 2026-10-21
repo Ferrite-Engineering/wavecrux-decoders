@@ -97,26 +97,50 @@ A release is one **plugin** (one library, which may register several decoders, a
    must match `VERSION`.
 3. **CI builds and publishes**: the release workflow builds the decoder on all
    three platforms from the tag, runs the full test suite (including
-   sanitizers) on each, signs the macOS and Windows libraries, packages each
-   platform as `wcx-<plugin>-<version>-<platform>.zip` (library, `LICENSE`,
-   `NOTICE`, plugin `README.md`), writes `SHA256SUMS` (LF line endings), and
-   creates the GitHub Release with the changelog section as its notes. If any
-   platform could not be signed, the release is created as a **draft** and a
-   maintainer finishes it by hand (`tools/release.py` documents both steps).
+   sanitizers) on each, signs the macOS and Windows binaries, packages each
+   platform as `wcx-<plugin>-<version>-<platform>.zip`, writes `SHA256SUMS`
+   (LF line endings), and creates the GitHub Release with the changelog
+   section as its notes. If any platform could not be signed, the release is
+   created as a **draft** and a maintainer finishes it by hand
+   (`tools/release.py` documents both steps).
 4. **The catalog entry** (`catalog.json`, schema below) is written by
    `tools/release.py finalize` and attached to the release.
 
-**Nothing is built on a developer's machine for release.** A library a user
-downloads was compiled, tested and signed by this repository's CI from the
-tagged commit.
+**What an archive holds:**
+
+| Path | What |
+|---|---|
+| `libwcx_<plugin>.dylib`, `libwcx_<plugin>.so` or `wcx_<plugin>.dll` | the plugin, at the top level, where WaveCrux looks for it |
+| `tools/wcxhost` (`tools/wcxhost.exe` on Windows) | the host emulator ([testing standard §5](testing-standard.md#5-the-host-emulator)), built in the same job from the same commit, so a decode can be checked without WaveCrux, in CI for example. WaveCrux does not scan subfolders, so it never mistakes it for a plugin |
+| `tools/README.md` | how to run wcxhost, from `tools/wcxhost/README.md` |
+| `README.md`, `LICENSE`, `NOTICE` | the plugin's README, which is its installation guide, and the licence texts |
+
+For example, from the folder a Linux archive was unpacked into:
+
+```
+tools/wcxhost --plugin ./libwcx_pcie.so --vcd tb.vcd --bindings tb.bindings.json --sort --check expected.json
+```
+
+Every platform's archive has the same layout, so a platform without
+wcxhost fails `release.py package` as a missing library does.
+
+**Dry runs:** `workflow_dispatch` of the release workflow with an existing
+tag builds, tests, signs and notarizes on all three platforms and keeps the
+archives as workflow artifacts; it never publishes. Its optional `ref`
+builds another branch or commit under that tag's name, so a change to the
+release tooling is tried before it is merged.
+
+**Nothing is built on a developer's machine for release.** A library or
+wcxhost a user downloads was compiled, tested and signed by this
+repository's CI from the tagged commit.
 
 **Signing:**
 
 | Platform | How | Why |
 |---|---|---|
-| macOS | Developer ID Application (team `7957R7M965`), hardened runtime, timestamped; notarized | WaveCrux's notarized macOS build enforces library validation, so today it loads only plugins signed by Ferrite Engineering's team. A downloaded library is also quarantined, and Gatekeeper refuses a quarantined library that is not notarized. |
-| Windows | Authenticode through Azure Trusted Signing, the same account that signs WaveCrux | SmartScreen and enterprise application control |
-| Linux | Unsigned; integrity through `SHA256SUMS` and build provenance | No platform mechanism a loader checks |
+| macOS | Developer ID Application (team `7957R7M965`), hardened runtime, timestamped; the library and wcxhost are notarized in one submission. wcxhost has one entitlement, `com.apple.security.cs.disable-library-validation`, so it also loads plugins a user builds | WaveCrux's notarized macOS build enforces library validation, so today it loads only plugins signed by Ferrite Engineering's team. A downloaded library or executable is also quarantined, and Gatekeeper refuses a quarantined one that is not notarized. |
+| Windows | Authenticode through Azure Trusted Signing, the same account that signs WaveCrux, for the DLL and `wcxhost.exe` | SmartScreen and enterprise application control |
+| Linux | Unsigned; integrity through `SHA256SUMS` and build provenance. The glibc floor (§1) is measured on wcxhost as well as the library | No platform mechanism a loader checks |
 
 **Provenance:** every release archive carries a GitHub build-provenance
 attestation (`actions/attest-build-provenance`), so anyone can verify with
