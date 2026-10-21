@@ -1,0 +1,15 @@
+{
+  "signal_bindings": {
+    "clk": "tb.tx_clk",
+    "tlp_data": "tb.tx_tlp_data",
+    "tlp_sop": "tb.tx_tlp_sop",
+    "tlp_eop": "tb.tx_tlp_eop",
+    "tlp_valid": "tb.tx_tlp_valid",
+    "peer_data": "tb.tx_peer_data",
+    "peer_sop": "tb.tx_peer_sop",
+    "peer_eop": "tb.tx_peer_eop",
+    "peer_valid": "tb.tx_peer_valid"
+  },
+  "decoder": "openpcie.pcie_tlp_down",
+  "parameters": {}
+}

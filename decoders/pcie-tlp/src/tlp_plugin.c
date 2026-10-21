@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "tlp_format.h"
+#include "tlp_pair.h"
 #include "wavecrux_decoder.h"
 #include "wcx/arena.h"
 #include "wcx/decoder.h"
@@ -63,8 +64,8 @@ static const char k_manifest[] =
     "\"enum_values\":[\"compact\",\"full\"],"
     "\"enum_labels\":{\"compact\":\"Compact\",\"full\":\"Full (bus/device, tag, status)\"},"
     "\"display_name\":\"Labels\","
-    "\"description\":\"Compact leaves out what a single-device link does not need -- "
-    "bus/device/function 01:00.0, the tag, a Successful status -- so the label fits its box. "
+    "\"description\":\"Compact leaves out what a single-device link does not need "
+    "(bus/device/function 01:00.0, the tag, a Successful status), so the label fits its box. "
     "Everything stays in the transaction's fields.\"},"
     "{\"name\":\"span\",\"kind\":\"enum\",\"default\":\"packet\","
     "\"enum_values\":[\"packet\",\"until_next\"],"
@@ -97,13 +98,15 @@ typedef struct tlp_stream {
     uint32_t dw[TLP_MAX_DW];
 } tlp_stream;
 
-typedef struct tlp_request {
-    bool valid;
-    uint32_t requester;
-    tlp_match match;
-} tlp_request;
-
-typedef enum run_kind { RUN_NONE = 0, RUN_UNKNOWN, RUN_NO_SOP } run_kind;
+// Repeated errors collapse into one transaction (SPEC.md §4): beat errors
+// count beats, framing errors count TLPs.
+typedef enum run_kind {
+    RUN_NONE = 0,
+    RUN_UNKNOWN,   // beat error
+    RUN_NO_SOP,    // beat error
+    RUN_SOP_EARLY, // framing error
+    RUN_SHORT,     // framing error
+} run_kind;
 
 typedef struct tlp_run {
     run_kind kind;
@@ -111,6 +114,10 @@ typedef struct tlp_run {
     uint64_t start_fs;
     uint64_t end_fs;
     uint64_t count;
+    const char *key1; // the first occurrence's extra fields; NULL for none
+    uint64_t v1;
+    const char *key2;
+    uint64_t v2;
 } tlp_run;
 
 typedef struct tlp_held {
@@ -129,7 +136,7 @@ typedef struct tlp_state {
     bool peer_bound;
     tlp_stream main;
     tlp_stream peer;
-    tlp_request req[256]; // by tag (8-bit tags, §2.2.6.2)
+    tlp_pairs pairs;
     tlp_run run;
     tlp_held held;
 } tlp_state;
@@ -199,73 +206,44 @@ static void run_end(wcx_decoder *d, tlp_state *st) {
     if (r->kind == RUN_NONE) {
         return;
     }
-    const char *suffix = r->count > 1u ? wcx_arena_printf(wcx_decoder_arena(d), " (%llu beats)",
-                                                          (unsigned long long)r->count)
-                                       : "";
-    error_tx(d, st, r->start_fs, r->end_fs, r->what, suffix != NULL ? suffix : "", "occurrences",
-             r->count, NULL, 0u);
+    wcx_arena *a = wcx_decoder_arena(d);
+    const bool beats = r->kind == RUN_UNKNOWN || r->kind == RUN_NO_SOP;
+    const char *label =
+        r->count > 1u ? wcx_arena_printf(a, "TLP error: %s (%llu %s)", r->what,
+                                         (unsigned long long)r->count, beats ? "beats" : "times")
+                      : wcx_arena_printf(a, "TLP error: %s", r->what);
+    wcx_json j;
+    wcx_json_begin(&j, a);
+    wcx_json_add_str(&j, "type", "error");
+    wcx_json_add_str(&j, "error", r->what);
+    if (r->key1 != NULL) {
+        wcx_json_add_u64(&j, r->key1, r->v1);
+    }
+    if (r->key2 != NULL) {
+        wcx_json_add_u64(&j, r->key2, r->v2);
+    }
+    wcx_json_add_u64(&j, "occurrences", r->count);
     r->kind = RUN_NONE;
+    commit(d, st, r->start_fs, r->end_fs, label, wcx_json_end(&j), true);
 }
 
-static void run_step(wcx_decoder *d, tlp_state *st, run_kind kind, const char *what, uint64_t t) {
+// Continues the open run when it is of the same kind, else ends it and
+// starts a new one; the fields of a run are its first occurrence's.
+static void run_step(wcx_decoder *d, tlp_state *st, const tlp_run *occurrence) {
     tlp_run *r = &st->run;
-    if (r->kind == kind) {
-        r->end_fs = t;
+    if (r->kind == occurrence->kind) {
+        r->end_fs = occurrence->end_fs;
         r->count++;
         return;
     }
     run_end(d, st);
-    r->kind = kind;
-    r->what = what;
-    r->start_fs = t;
-    r->end_fs = t;
+    *r = *occurrence;
     r->count = 1u;
 }
 
-// ── pairing (SPEC.md §5.3) ──────────────────────────────────────────────────
-
-static void note_request(tlp_state *st, const tlp_stream *s) {
-    const uint32_t dw0 = s->dw[0];
-    if (s->n < tlp_header_dw(dw0)) {
-        return;
-    }
-    const uint32_t type = (dw0 >> 24) & 0x1Fu;
-    const bool has_data = ((dw0 >> 29) & 0x2u) != 0u;
-    tlp_match m = {TLP_MATCH_NONE, 0u, 0u};
-    if (tlp_kind_of(dw0) == TLP_KIND_CFG) {
-        m.kind = has_data ? TLP_MATCH_CFG_WRITE : TLP_MATCH_CFG_READ;
-        m.reg = s->dw[2] & 0xFFCu;
-    } else if (type == 0x02u) {
-        m.kind = has_data ? TLP_MATCH_IO_WRITE : TLP_MATCH_IO_READ;
-        m.addr = s->dw[2] & ~3u;
-    } else if (tlp_kind_of(dw0) == TLP_KIND_MEM && !has_data) {
-        m.kind = TLP_MATCH_MEM;
-        m.addr = (tlp_header_dw(dw0) == 4u ? s->dw[3] : s->dw[2]) & ~3u;
-    } else {
-        return;
-    }
-    tlp_request *r = &st->req[(s->dw[1] >> 8) & 0xFFu];
-    r->valid = true;
-    r->requester = s->dw[1] >> 16;
-    r->match = m;
-}
-
-// The request a completion answers, removed unless more split completions
-// follow (byte count beyond this completion's payload).
-static tlp_match take_match(tlp_state *st, const tlp_stream *s) {
-    const tlp_match none = {TLP_MATCH_NONE, 0u, 0u};
-    const uint32_t dw0 = s->dw[0];
-    tlp_request *r = &st->req[(s->dw[2] >> 8) & 0xFFu];
-    if (!r->valid || r->requester != (s->dw[2] >> 16)) {
-        return none;
-    }
-    const uint32_t len = dw0 & 0x3FFu;
-    const uint32_t payload = 4u * (len != 0u ? len : 1024u);
-    const bool has_data = ((dw0 >> 29) & 0x2u) != 0u;
-    if (!has_data || (s->dw[1] & 0xFFFu) <= payload) {
-        r->valid = false;
-    }
-    return r->match;
+static void beat_error(wcx_decoder *d, tlp_state *st, run_kind kind, const char *what, uint64_t t) {
+    const tlp_run o = {kind, what, t, t, 1u, NULL, 0u, NULL, 0u};
+    run_step(d, st, &o);
 }
 
 // ── one TLP ─────────────────────────────────────────────────────────────────
@@ -274,13 +252,18 @@ static void decode(wcx_decoder *d, tlp_state *st) {
     const tlp_stream *s = &st->main;
     const uint32_t hdr = tlp_header_dw(s->dw[0]);
     if (s->n < hdr) {
-        error_tx(d, st, s->start_fs, s->last_fs, "TLP shorter than its header", "", "expected", hdr,
-                 "actual", s->n);
+        const tlp_run o = {RUN_SHORT,   "TLP shorter than its header",
+                           s->start_fs, s->last_fs,
+                           1u,          "expected",
+                           hdr,         "actual",
+                           s->n};
+        run_step(d, st, &o);
         return;
     }
+    run_end(d, st);
     tlp_match m = {TLP_MATCH_NONE, 0u, 0u};
     if (tlp_kind_of(s->dw[0]) == TLP_KIND_CPL) {
-        m = take_match(st, s);
+        m = tlp_pair_take(&st->pairs, s->dw);
     }
     tlp_text text;
     tlp_format(wcx_decoder_arena(d), s->dw, s->n, &m, st->full, &text);
@@ -353,7 +336,7 @@ static void peer_edge(tlp_state *st, const wcx_layout *l, const uint8_t *bits, u
         return;
     }
     if (stream_push(&st->peer, &b, t)) {
-        note_request(st, &st->peer);
+        tlp_pair_note(&st->pairs, st->peer.dw, st->peer.n);
     }
 }
 
@@ -367,22 +350,35 @@ static void main_edge(wcx_decoder *d, tlp_state *st, const wcx_layout *l, const 
         return;
     }
     if (b.kind == BEAT_UNKNOWN) {
-        run_step(d, st, RUN_UNKNOWN, k_unknown_what[b.unknown], t);
+        beat_error(d, st, RUN_UNKNOWN, k_unknown_what[b.unknown], t);
         st->main.open = false;
         return;
     }
     if (!b.sop && !st->main.open) {
-        run_step(d, st, RUN_NO_SOP, "data beat without SOP", t);
+        beat_error(d, st, RUN_NO_SOP, "data beat without SOP", t);
         return;
     }
-    run_end(d, st);
+    bool erred = false;
     if (b.sop && st->main.open) {
-        error_tx(d, st, st->main.start_fs, st->main.last_fs, "SOP before EOP", "", "dw_count",
-                 st->main.n, NULL, 0u);
+        const tlp_run o = {RUN_SOP_EARLY,
+                           "SOP before EOP",
+                           st->main.start_fs,
+                           st->main.last_fs,
+                           1u,
+                           "dw_count",
+                           st->main.n,
+                           NULL,
+                           0u};
+        run_step(d, st, &o);
+        erred = true;
     }
     if (stream_push(&st->main, &b, t)) {
-        note_request(st, &st->main);
-        decode(d, st);
+        tlp_pair_note(&st->pairs, st->main.dw, st->main.n);
+        decode(d, st); // ends the run, or continues a run of short TLPs
+        return;
+    }
+    if (!erred) {
+        run_end(d, st);
     }
 }
 
@@ -443,8 +439,9 @@ static void tlp_fini(wcx_decoder *d, void *state) {
     wcx_edge_free(&st->clk);
 }
 
-// Per sample: a run that ends, a SOP-before-EOP error and the TLP itself
-// (SPEC.md §4, §5). At flush: a run, a missing EOP and the held one.
+// Per sample: a run that ends and the TLP itself (SPEC.md §4, §5). At flush:
+// a run (a SOP-before-EOP run can be open beside an open TLP), a missing EOP
+// and the held one.
 #define TLP_MAX_PER_CALL 3u
 
 static WcDecoderHandle tlp_down_create(const char *config_json);
@@ -493,5 +490,5 @@ static WcDecoderHandle tlp_up_create(const char *config_json) {
 
 static const wcx_decoder_class *const k_classes[] = {&k_down, &k_up};
 
-WCX_PLUGIN("openPCIE PCIe TLP decoder",
-           "Apache-2.0, Chili.CHIPS -- github.com/Ferrite-Engineering/wavecrux-decoders", k_classes)
+WCX_PLUGIN("PCIe TLP decoder (openPCIE)",
+           "Apache-2.0, Chili.CHIPS: github.com/Ferrite-Engineering/wavecrux-decoders", k_classes)

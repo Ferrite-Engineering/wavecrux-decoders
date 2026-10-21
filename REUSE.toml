@@ -45,3 +45,27 @@ path = ["decoders/pcie/fixtures/captured/**/*.vcd"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Chili.CHIPS*ba"
 SPDX-License-Identifier = "BSD-3-Clause"
+
+# The PCIe TLP decoder is Chili.CHIPS's (CODEOWNERS): its files without an
+# SPDX header (documentation, metadata, fixtures, fuzz seeds) name them, not
+# Ferrite. Its C and Python files carry their own headers.
+[[annotations]]
+path = [
+    "decoders/pcie-tlp/**/*.md",
+    "decoders/pcie-tlp/**/*.json",
+    "decoders/pcie-tlp/**/*.vcd",
+    "decoders/pcie-tlp/**/*.seed",
+    "decoders/pcie-tlp/VERSION",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Chili.CHIPS"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Captured waveforms of the PCIe TLP decoder come from openPCIE's
+# co-simulation and keep its BSD-3-Clause licence and notice (see
+# decoders/pcie-tlp/fixtures/captured/PROVENANCE.md).
+[[annotations]]
+path = ["decoders/pcie-tlp/fixtures/captured/**/*.vcd"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Chili.CHIPS"
+SPDX-License-Identifier = "BSD-3-Clause"

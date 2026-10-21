@@ -48,12 +48,19 @@ typedef struct tlp_text {
 
 tlp_kind tlp_kind_of(uint32_t dw0);
 
-// Header DWs: 3, or 4 when Fmt bit 0 is set.
+// Header DWs: 3, or 4 when Fmt bit 0 is set; 1 for a TLP prefix (Fmt bit 2).
 uint32_t tlp_header_dw(uint32_t dw0);
 
-// DWs the header announces, or 0 for a TLP prefix (Fmt bit 2), which is
-// not checked.
+// DWs the header announces (header, payload, and the ECRC DW when TD is
+// set), or 0 for a TLP prefix (Fmt bit 2), which is not checked.
 uint32_t tlp_expected_dw(uint32_t dw0);
+
+// A completion's Byte Count from its DW1: 0 encodes 4096 (§2.2.9).
+uint32_t tlp_byte_count(uint32_t dw1);
+
+// The 10-bit tag: T9 and T8 from DW0 bits 23 and 19, the low 8 bits from
+// `tag8` (DW1[15:8] of a request, DW2[15:8] of a completion) (§2.2.6.2).
+uint32_t tlp_tag(uint32_t dw0, uint32_t tag8);
 
 // Register name for a configuration offset; "reg 0x<3>" from the arena for
 // one without a name.

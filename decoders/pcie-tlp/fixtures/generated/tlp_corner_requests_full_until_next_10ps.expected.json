@@ -1,0 +1,9 @@
+[
+{"startTime":2800,"endTime":6000,"label":"TLP error: TLP shorter than its header","isError":true,"fields":{"type":"error","error":"TLP shorter than its header","expected":"4","actual":"3","occurrences":"1"}},
+{"startTime":6000,"endTime":7600,"label":"TLP error: tlp_eop is X or Z","isError":true,"fields":{"type":"error","error":"tlp_eop is X or Z","occurrences":"1"}},
+{"startTime":7600,"endTime":11600,"label":"MWr64 0x80000000 = 0xCAFEBABE","isError":false,"fields":{"type":"MWr64","fmt":"3","type_code":"0x00","length":"1","dw_count":"5","header":"60000001 0000000F 00000000 80000000","address":"0x0000000080000000","length_dw":"1","requester":"00:00.0","tag":"0","first_be":"0xF","last_be":"0x0","data":"0xCAFEBABE"}},
+{"startTime":11600,"endTime":14800,"label":"TLP Fmt 4 Type 0x10","isError":false,"fields":{"type":"TLP","fmt":"4","type_code":"0x10","length":"0","dw_count":"4","header":"90000000"}},
+{"startTime":14800,"endTime":18000,"label":"TLP Fmt 2 Type 0x01","isError":false,"fields":{"type":"TLP","fmt":"2","type_code":"0x01","length":"1","dw_count":"4","header":"41000001 0000000F 80000000"}},
+{"startTime":18000,"endTime":21200,"label":"TLP Fmt 1 Type 0x04","isError":false,"fields":{"type":"TLP","fmt":"1","type_code":"0x04","length":"1","dw_count":"4","header":"24000001 0000600F 01000010 00000000"}},
+{"startTime":21200,"endTime":22800,"label":"MRd32 0x80000040  1 DW  tag 131","isError":false,"fields":{"type":"MRd32","fmt":"0","type_code":"0x00","length":"1","dw_count":"3","header":"00080001 0000310F 80000040","address":"0x80000040","length_dw":"1","requester":"00:00.0","tag":"305","first_be":"0xF","last_be":"0x0"}}
+]

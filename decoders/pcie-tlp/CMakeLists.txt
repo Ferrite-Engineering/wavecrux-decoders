@@ -10,6 +10,7 @@ wcx_add_decoder(
     NAME         pcie_tlp
     ID           openpcie.pcie_tlp_down
     SOURCES      src/tlp_format.c
+                 src/tlp_pair.c
                  src/tlp_plugin.c
     INCLUDE_DIRS src
     UNIT_TESTS   ${_tlp_unit_tests}

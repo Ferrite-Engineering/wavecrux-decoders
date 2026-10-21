@@ -8,5 +8,5 @@
 {"startTime":236000,"endTime":260000,"label":"MRd32 0xA0000000  1024 DW  tag 15","isError":false,"fields":{"type":"MRd32","fmt":"0","type_code":"0x00","length":"0","dw_count":"3","header":"00000000 000015FF A0000000","address":"0xA0000000","length_dw":"1024","requester":"00:00.0","tag":"21","first_be":"0xF","last_be":"0xF"}},
 {"startTime":260000,"endTime":284000,"label":"MRd32 0xA0000100  2 DW  tag 16","isError":false,"fields":{"type":"MRd32","fmt":"0","type_code":"0x00","length":"2","dw_count":"3","header":"00000002 000016FF A0000100","address":"0xA0000100","length_dw":"2","requester":"00:00.0","tag":"22","first_be":"0xF","last_be":"0xF"}},
 {"startTime":284000,"endTime":348000,"label":"MsgD code 0x50  route 0","isError":false,"fields":{"type":"MsgD","fmt":"3","type_code":"0x10","length":"1","dw_count":"5","header":"70000001 00000050 00000000 00000000","message_code":"0x50","routing":"0"}},
-{"startTime":348000,"endTime":356000,"label":"TLP error: TLP shorter than its header","isError":true,"fields":{"type":"error","error":"TLP shorter than its header","expected":"3","actual":"2"}}
+{"startTime":348000,"endTime":356000,"label":"TLP Fmt 4 Type 0x1F","isError":false,"fields":{"type":"TLP","fmt":"4","type_code":"0x1F","length":"0","dw_count":"2","header":"9F000000"}}
 ]

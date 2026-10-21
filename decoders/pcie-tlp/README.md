@@ -40,10 +40,17 @@ in Pro; the TLP name is in `type` here (this repository's convention) and in
 
 **Decoders:** `openpcie.pcie_tlp_down` (TLP Downstream) and
 `openpcie.pcie_tlp_up` (TLP Upstream). They are the same decoder, registered
-twice so the two rows of a link get different names.
+twice so the two rows of a link get different names. The ids are
+permanent: saved WaveCrux sessions refer to them.
 
-**Parameters:** `labels` (`compact` or `full`), `span` (`packet` or
-`until_next`). The output contract is in [`SPEC.md`](SPEC.md).
+**Parameters:**
+
+| Parameter | Values | |
+|---|---|---|
+| `labels` (Labels) | `compact` (default), `full` | Compact leaves out what a link with one endpoint does not need (bus/device/function 01:00.0, the tag, a Successful status), so the label fits its box; full shows them. Every field stays in the transaction's details either way. |
+| `span` (Box width) | `packet` (default), `until_next` | Packet draws each TLP as long as it is on the stream; until_next widens each box up to the next transaction, so labels stay readable when zoomed out. |
+
+The output contract is in [`SPEC.md`](SPEC.md).
 
 **Needs** WaveCrux 1.0.1 or later.
 
@@ -125,4 +132,7 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev -R pcie_t
 python3 decoders/pcie-tlp/tools/generate_fixtures.py --check
 ```
 
-Licence: Apache-2.0, Chili.CHIPS.
+The captured fixtures come from openPCIE's co-simulation, how and why in
+[`fixtures/captured/PROVENANCE.md`](fixtures/captured/PROVENANCE.md).
+
+Licence: Apache-2.0, Chili.CHIPS. Captured traces: BSD-3-Clause.
