@@ -16,9 +16,9 @@
 #define TLP_PAIR_WAYS 4u    // requesters per tag before the oldest is replaced
 
 typedef struct tlp_pair_entry {
+    uint64_t seq; // when the entry was made: the smallest is the oldest
     bool valid;
     uint16_t requester;
-    uint64_t seq; // when the entry was made: the smallest is the oldest
     tlp_match match;
 } tlp_pair_entry;
 

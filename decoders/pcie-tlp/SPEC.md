@@ -84,9 +84,9 @@ a TLP with TD set is counted (§5.6), never decoded.
 
 The **tag** is 10 bits (§2.2.6.2): T9 = DW0 bit 23, T8 = DW0 bit 19, and the
 low 8 bits from DW1[15:8] (requests) or DW2[15:8] (completions). `<TT>` is
-the tag in hex, at least 2 digits (3 for a tag above 0xFF). These tag
-fields are those of non-Flit Mode TLPs; a Flit Mode header places its
-14-bit tag elsewhere and is not decoded as such.
+the tag in hex, at least 2 digits (3 for a tag above 0xFF). These fields
+are those of non-Flit Mode TLPs: a Flit Mode header (PCIe 6.0 and later)
+has another layout, with a 14-bit tag, and is not decoded correctly.
 
 Kinds, by Type and Fmt; any other combination, and every prefix, is §5.5:
 
@@ -172,8 +172,7 @@ write), memory reads (low address; memory writes are not remembered), and
 I/O requests (DW2 with bits [1:0] cleared). A later request with the same
 requester and tag replaces the entry, which keeps its place in the order
 below. Up to 4 requesters are remembered per
-tag; a fifth replaces the oldest entry of that tag (the one made first,
-counting a reused entry from when it was made). A completion **matches**
+tag; a fifth replaces the oldest entry of that tag. A completion **matches**
 the entry with its requester and tag. A match is removed, unless the
 completion has data and byte count + (lower address & 3) > 4 x N: more
 split completions follow (§2.3.1.1).

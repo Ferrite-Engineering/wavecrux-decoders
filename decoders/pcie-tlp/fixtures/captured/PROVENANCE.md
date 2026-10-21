@@ -28,7 +28,8 @@ output:
 
 1. A reviewer who did not see the decoder's code (`src/`, `tests/`,
    `fuzz/`) or run it wrote a model of SPEC.md, checked it byte for byte
-   against all hand-derived `fixtures/generated/*.expected.json`, and ran
+   against all hand-derived `fixtures/generated/*.expected.json` (as of
+   `00e58e2`), and ran
    it on the trace. That gave the committed files.
 2. A second reviewer, under the same rules and without seeing those files,
    wrote `tools/derive_captured_expected.py`: it reads the VCD, decodes each
@@ -50,13 +51,14 @@ The decoder was run on the fixtures only afterwards, as the test.
 
 BSD-3-Clause, openPCIE's `LICENSE`, by its copyright holder Chili.CHIPS,
 who also wrote this decoder. Only the simulation's output is copied here:
-signal values of our RTL, no source code of openPCIE or of the VIP. pcieVHost
+signal values seen at our RTL, no source code of openPCIE or of the VIP. pcieVHost
 and VProc (GPL-3.0-or-later) drive the link in the simulation; none of their
 code or text is in the trace.
 
 The trace is redistributed under openPCIE's notice (`LICENSE` at commit
 `2318f2e`; its `REUSE.toml` gives `SPDX-FileCopyrightText: 2026
-CHILI.CHIPS.LLC`, `SPDX-License-Identifier: BSD-3-Clause`):
+CHILI.CHIPS.LLC`, `SPDX-License-Identifier: BSD-3-Clause`; the same
+holder as Chili.CHIPS in `LICENSE` and in this repository's `REUSE.toml`):
 
 ```
 BSD 3-Clause License
@@ -117,7 +119,8 @@ python3 <this repo>/decoders/pcie-tlp/tools/make_captured.py --vcd tb.vcd
 The run must end with `FIRMWARE RESULT ... PASS (0x0000face)`: link up,
 21 TLPs sent by the firmware, the payload written to the EP read back.
 `make_captured.py` keeps only `tb.tlp_view`, trims it to the TLP traffic
-(#154567000 to #385319000, 8 clocks of margin on each side), drops the
+(#154567000 to #385319000, 8 clocks before the first and after the last
+change of a `*_valid`), drops the
 `$date` section and writes the same trace for both fixtures (about 500 KB
 each).
 

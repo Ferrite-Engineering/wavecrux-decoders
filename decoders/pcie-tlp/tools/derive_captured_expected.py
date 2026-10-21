@@ -7,6 +7,8 @@
 # reads nothing from it. It implements only what the captured traces need
 # and stops with an error on anything else, rather than guessing.
 
+"""Derive a captured fixture's expected output from SPEC.md and its VCD."""
+
 import argparse
 import itertools
 import json
@@ -373,6 +375,8 @@ def main():
         txs = derive(a.stem)
     except Unsupported as e:
         sys.exit(f"derive_captured_expected: unsupported: {e}")
+    except FileNotFoundError as e:
+        sys.exit(f"derive_captured_expected: no such fixture: {e.filename}")
     text = serialize(txs)
     if a.out:
         out = Path(a.out).resolve()
