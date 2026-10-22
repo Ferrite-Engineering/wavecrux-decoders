@@ -6,7 +6,9 @@ All notable changes to the PCIe TLP decoder (`wcx_pcie_tlp`). The format is
 
 ## [Unreleased]
 
-First release here, to become 0.1.0. The decoder comes from openPCIE
+## [0.1.0] - 2026-10-21
+
+First release here. The decoder comes from openPCIE
 (`5.sim/tools/wavecrux-pcie-tlp`), now Apache-2.0 and built on `common/`.
 
 ### Changed (from the openPCIE plugin)
