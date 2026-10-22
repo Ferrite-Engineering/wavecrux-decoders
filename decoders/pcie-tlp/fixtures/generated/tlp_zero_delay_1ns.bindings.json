@@ -1,0 +1,9 @@
+{
+  "signal_bindings": {
+    "clk": "tb.clk",
+    "tlp_data": "tb.tlp_data",
+    "tlp_sop": "tb.tlp_sop",
+    "tlp_eop": "tb.tlp_eop",
+    "tlp_valid": "tb.tlp_valid"
+  }
+}

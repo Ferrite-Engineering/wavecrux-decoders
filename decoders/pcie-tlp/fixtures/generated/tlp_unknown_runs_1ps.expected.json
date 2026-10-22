@@ -1,0 +1,6 @@
+[
+{"startTime":28000,"endTime":44000,"label":"TLP error: data beat without SOP (3 beats)","isError":true,"fields":{"type":"error","error":"data beat without SOP","occurrences":"3"}},
+{"startTime":60000,"endTime":68000,"label":"TLP error: tlp_data is X or Z (2 beats)","isError":true,"fields":{"type":"error","error":"tlp_data is X or Z","occurrences":"2"}},
+{"startTime":84000,"endTime":100000,"label":"TLP error: tlp_sop is X or Z (3 beats)","isError":true,"fields":{"type":"error","error":"tlp_sop is X or Z","occurrences":"3"}},
+{"startTime":108000,"endTime":124000,"label":"CfgRd BAR0","isError":false,"fields":{"type":"CfgRd0","fmt":"0","type_code":"0x04","length":"1","dw_count":"3","header":"04000001 0000010F 01000010","bus":"1","device":"0","function":"0","register":"0x010","register_name":"BAR0","requester":"00:00.0","tag":"1","first_be":"0xF"}}
+]

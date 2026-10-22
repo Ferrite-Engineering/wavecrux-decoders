@@ -1,0 +1,9 @@
+[
+{"startTime":28000,"endTime":28000,"label":"TLP error: data beat without SOP","isError":true,"fields":{"type":"error","error":"data beat without SOP","occurrences":"1"}},
+{"startTime":36000,"endTime":44000,"label":"TLP error: SOP before EOP","isError":true,"fields":{"type":"error","error":"SOP before EOP","dw_count":"2","occurrences":"1"}},
+{"startTime":52000,"endTime":68000,"label":"MRd32 0x80000000  1 DW  tag 01","isError":false,"fields":{"type":"MRd32","fmt":"0","type_code":"0x00","length":"1","dw_count":"3","header":"00000001 0000010F 80000000","address":"0x80000000","length_dw":"1","requester":"00:00.0","tag":"1","first_be":"0xF","last_be":"0x0"}},
+{"startTime":76000,"endTime":100000,"label":"MWr32 0x80000000 = 0x00000001 +1 DW  [4 DW, expected 5]","isError":true,"fields":{"type":"MWr32","fmt":"2","type_code":"0x00","length":"2","dw_count":"4","header":"40000002 000000FF 80000000","address":"0x80000000","length_dw":"2","requester":"00:00.0","tag":"0","first_be":"0xF","last_be":"0xF","data":"0x00000001","error":"length does not match the Length field","expected":"5","actual":"4"}},
+{"startTime":108000,"endTime":116000,"label":"TLP error: TLP shorter than its header","isError":true,"fields":{"type":"error","error":"TLP shorter than its header","expected":"3","actual":"2","occurrences":"1"}},
+{"startTime":124000,"endTime":124000,"label":"TLP error: tlp_data is X or Z","isError":true,"fields":{"type":"error","error":"tlp_data is X or Z","occurrences":"1"}},
+{"startTime":140000,"endTime":148000,"label":"TLP error: missing EOP at end of capture","isError":true,"fields":{"type":"error","error":"missing EOP at end of capture","dw_count":"2"}}
+]
