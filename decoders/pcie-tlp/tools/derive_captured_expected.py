@@ -309,8 +309,10 @@ def derive(stem):
     names = [sb[s] for s in main + (peer if has_peer else [])]
     pairing, out = Pairing(), []
     cur_main, cur_peer = None, None  # (start, [dws]) / [dws]
+    last_edge = 0
 
     for t, v in sample_edges(CAPTURED / f"{stem}.vcd", sb["clk"], names):
+        last_edge = t
         if has_peer and bit(v[sb["peer_valid"]]):
             d = word(v[sb["peer_data"]])
             sop, eop = bit(v[sb["peer_sop"]]), bit(v[sb["peer_eop"]])
@@ -349,6 +351,8 @@ def derive(stem):
     if span == "until_next":
         for a, nxt in itertools.pairwise(out):
             a[1] = max(a[1], nxt[0])
+        if out:
+            out[-1][1] = max(out[-1][1], last_edge)
     return out
 
 

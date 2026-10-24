@@ -6,6 +6,12 @@ All notable changes to the PCIe TLP decoder (`wcx_pcie_tlp`). The format is
 
 ## [Unreleased]
 
+### Fixed
+
+- With `span = until_next`, the last transaction now ends at the last clock
+  edge, not at its EOP: a short last TLP was a few pixels wide when zoomed
+  out, with no label.
+
 ## [0.1.0] - 2026-10-21
 
 First release here. The decoder comes from openPCIE

@@ -43,7 +43,8 @@ without SOP is skipped, and a SOP restarts collection.
 - An error starts and ends as §4 says.
 - With `span = until_next`, every transaction is held until the next one is
   emitted; the held one's end becomes the next one's start if that is later.
-  The last one is released at flush unchanged.
+  The last one is released at flush and ends at the last rising `clk` edge
+  if that is later.
 
 ## 4. Errors
 
