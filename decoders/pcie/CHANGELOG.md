@@ -8,6 +8,18 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 
 ### Added
 
+- Multi-lane links, x2 to x16 (`SPEC.md` §12), for the PIPE and Data Link
+  Layer decoders, on the existing ids: optional `data1`/`datak1` …
+  `data15`/`datak15` and per-lane `rxvalid`, `txelecidle`, `rxstatus`.
+  Lane deskew on the ordered sets (`max_skew`, default 8 symbols), the link
+  width from the TS2s at the end of training or, in a trace that starts in
+  L0, from SKP (widened by a later SKP on more lanes), lane
+  reversal from Lane# (`lane_order`), per-lane descrambling, un-striping,
+  start-lane and PAD-fill checks. New transactions: `link_width`,
+  `lane_order`, `lanes_aligned`, `lane_skew`, `lane_mismatch`,
+  `framing_lane`, `pad_misplaced`, `unaligned`; TS1/TS2 carry `links` and
+  `lanes`, SKP OS per-lane counts, RxStatus its lane. With one lane bound
+  the output is unchanged. Requested in #8.
 - Each release archive now carries `tools/wcxhost` (`tools/wcxhost.exe` on
   Windows), the host emulator, signed like the library: it runs these
   decoders over a VCD without WaveCrux, for a check in CI. See

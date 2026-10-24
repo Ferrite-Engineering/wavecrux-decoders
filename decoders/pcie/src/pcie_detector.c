@@ -174,6 +174,13 @@ void pcie_detector_break(pcie_detector *det, pcie_break_reason reason) {
     }
 }
 
+void pcie_detector_set_os_lanes(pcie_detector *det, const pcie_os_lanes *lanes) {
+    // After the lock the loser is never fed again; setting it is harmless.
+    for (unsigned i = 0; i < det->branches; i++) {
+        pcie_pipeline_set_os_lanes(&det->br[i].pipe, lanes);
+    }
+}
+
 wcx_arena *pcie_detector_arena(pcie_detector *det) {
     return det->locked ? wcx_decoder_arena(det->d) : &det->arena;
 }

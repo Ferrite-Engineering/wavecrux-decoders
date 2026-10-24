@@ -70,12 +70,29 @@ WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
         wcx_manifest m;
         wcx_error err = {{0}};
         WCX_REQUIRE(wcx_manifest_parse(&m, defs[i].manifest_json, &err));
-        WCX_CHECK_EQ_U64(m.signal_count, 6);
+        // §2 and §12.1: lane 0's six, then five optional ones for each of
+        // lanes 1-15.
+        WCX_CHECK_EQ_U64(m.signal_count, 6u + 15u * 5u);
         for (size_t s = 0; s < 6 && s < m.signal_count; s++) {
             char name[32] = {0};
             WCX_IGNORE(wcx_manifest_text(&m, m.signals[s].name, name, sizeof name));
             WCX_CHECK_STR_EQ(name, sig_names[s]);
             WCX_CHECK_EQ_U64(m.signals[s].optional, s >= 3u);
+        }
+        for (unsigned lane = 1; lane < 16u && 6u + lane * 5u <= m.signal_count; lane++) {
+            static const char *const lane_names[5] = {"data", "datak", "rxvalid", "txelecidle",
+                                                      "rxstatus"};
+            const unsigned widths[5] = {8u * k_expected[i].lanes, k_expected[i].lanes, 1u, 1u, 3u};
+            for (unsigned f = 0; f < 5u; f++) {
+                const size_t s = 6u + (lane - 1u) * 5u + f;
+                char name[32] = {0};
+                char want[32] = {0};
+                WCX_IGNORE(wcx_manifest_text(&m, m.signals[s].name, name, sizeof name));
+                WCX_IGNORE(wcx_str_format(want, sizeof want, "%s%u", lane_names[f], lane));
+                WCX_CHECK_STR_EQ(name, want);
+                WCX_CHECK(m.signals[s].optional);
+                WCX_CHECK_EQ_U64(m.signals[s].bit_width, widths[f]);
+            }
         }
         // §2 widths: data 8N, datak N, rxstatus 3, the rest 1.
         const unsigned lanes = k_expected[i].lanes;
@@ -86,8 +103,16 @@ WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
         WCX_CHECK_EQ_U64(m.signals[4].bit_width, 1);
         WCX_CHECK_EQ_U64(m.signals[5].bit_width, 3);
         // §3 parameters: both have scrambling and sample_point (enums with
-        // labels); only the PIPE decoder has coalesce and show_idle (bools).
-        WCX_CHECK_EQ_U64(m.param_count, k_expected[i].dll ? 2u : 4u);
+        // labels), max_skew (int) and lane_order (enum, §12.1); only the PIPE
+        // decoder has coalesce and show_idle (bools).
+        WCX_CHECK_EQ_U64(m.param_count, k_expected[i].dll ? 4u : 6u);
+        const size_t ms = wcx_manifest_find_param(&m, "max_skew");
+        const size_t lo = wcx_manifest_find_param(&m, "lane_order");
+        WCX_REQUIRE(ms != WCX_JSON_NONE && lo != WCX_JSON_NONE);
+        WCX_CHECK_EQ_U64(m.params[ms].kind, WCX_PARAM_INT);
+        WCX_CHECK_EQ_U64(m.params[lo].kind, WCX_PARAM_ENUM);
+        WCX_CHECK(m.params[lo].enum_labels != WCX_JSON_NONE);
+        WCX_CHECK(wcx_jdoc_string_equals(&m.doc, m.params[lo].default_value, "auto"));
         const size_t scr = wcx_manifest_find_param(&m, "scrambling");
         const size_t sp = wcx_manifest_find_param(&m, "sample_point");
         WCX_REQUIRE(scr != WCX_JSON_NONE && sp != WCX_JSON_NONE);

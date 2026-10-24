@@ -88,6 +88,32 @@ void pcie_fe_emit_dllp_edb(pcie_sink *sink, const pcie_event *ev) {
     pcie_sink_emit(sink, ev->start_fs, ev->end_fs, "DLLP ended by EDB", wcx_json_end(&j), true);
 }
 
+// §12.10, §12.12: `STP on lane 2` and `PAD outside a packet (lane 5)`.
+static void emit_lane_error(pcie_sink *sink, const pcie_event *ev) {
+    wcx_arena *a = pcie_sink_arena(sink);
+    const unsigned lane = ev->u.lane_sym.lane;
+    wcx_json j;
+    wcx_json_begin(&j, a);
+    const char *label = NULL;
+    if (ev->kind == PCIE_EV_FRAMING_LANE) {
+        wcx_json_add_str(&j, "type", "framing_lane");
+        wcx_json_add_hex(&j, "symbol", ev->u.lane_sym.symbol, 2);
+        wcx_json_add_u64(&j, "lane", lane);
+        wcx_json_add_str(&j, "error",
+                         "A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 "
+                         "(x8 and wider).");
+        label = wcx_arena_printf(a, "%s on lane %u",
+                                 ev->u.lane_sym.symbol == PCIE_K_STP ? "STP" : "SDP", lane);
+    } else {
+        wcx_json_add_str(&j, "type", "pad_misplaced");
+        wcx_json_add_u64(&j, "lane", lane);
+        wcx_json_add_str(&j, "error",
+                         "PAD outside a packet is valid only as fill after END or EDB.");
+        label = wcx_arena_printf(a, "PAD outside a packet (lane %u)", lane);
+    }
+    pcie_sink_emit(sink, ev->start_fs, ev->end_fs, label, wcx_json_end(&j), true);
+}
+
 void pcie_fe_emit_error(pcie_sink *sink, const pcie_event *ev) {
     wcx_arena *a = pcie_sink_arena(sink);
     const unsigned sym = ev->u.symbol;
@@ -119,6 +145,10 @@ void pcie_fe_emit_error(pcie_sink *sink, const pcie_event *ev) {
             break;
         case PCIE_EV_STRAY_RUN:
             emit_stray(sink, ev);
+            break;
+        case PCIE_EV_FRAMING_LANE:
+        case PCIE_EV_PAD_MISPLACED:
+            emit_lane_error(sink, ev);
             break;
         case PCIE_EV_TS:
         case PCIE_EV_SKP:

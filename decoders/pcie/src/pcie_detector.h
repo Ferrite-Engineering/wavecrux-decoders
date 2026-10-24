@@ -93,6 +93,10 @@ void pcie_detector_begin_call(pcie_detector *det);
 void pcie_detector_symbol(pcie_detector *det, const pcie_sym *s);
 void pcie_detector_break(pcie_detector *det, pcie_break_reason reason);
 
+// The per-lane view of the ordered set whose COM is fed next (SPEC.md
+// §12.9), for every live pipeline. `lanes` must stay valid until that COM.
+void pcie_detector_set_os_lanes(pcie_detector *det, const pcie_os_lanes *lanes);
+
 // Where edge-level strings are built, and how they are emitted.
 wcx_arena *pcie_detector_arena(pcie_detector *det);
 void pcie_detector_emit(pcie_detector *det, uint64_t start_fs, uint64_t end_fs, const char *label,

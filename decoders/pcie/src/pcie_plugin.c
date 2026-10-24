@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "pcie_detector.h"
+#include "pcie_lanes.h"
 #include "pcie_manifest.h"
 #include "pcie_serial_plugin.h"
 #include "pcie_symbols.h"
@@ -27,15 +28,38 @@
 #include "wcx/edge.h"
 #include "wcx/json_writer.h"
 #include "wcx/sample.h"
+#include "wcx/str.h"
 
 // ── signals (SPEC.md §2; manifest order) ───────────────────────────────────
 
-enum { SIG_PCLK, SIG_DATA, SIG_DATAK, SIG_RXVALID, SIG_TXELECIDLE, SIG_RXSTATUS, SIG_COUNT };
+enum { SIG_PCLK, SIG_DATA, SIG_DATAK, SIG_RXVALID, SIG_TXELECIDLE, SIG_RXSTATUS, SIG_LANE0_END };
 
-#define PCIE_SIGNALS(lanes)                                                             \
-    {                                                                                   \
-        {"pclk", 1, false},   {"data", 8u * (lanes), false}, {"datak", (lanes), false}, \
-        {"rxvalid", 1, true}, {"txelecidle", 1, true},       {"rxstatus", 3, true},     \
+// Lanes 1-15 follow lane 0, five signals each, in this order (SPEC.md §12.1).
+enum { LANE_DATA, LANE_DATAK, LANE_RXVALID, LANE_TXELECIDLE, LANE_RXSTATUS, LANE_SIGNALS };
+
+#define SIG_COUNT (SIG_LANE0_END + (PCIE_MAX_LANES - 1u) * LANE_SIGNALS)
+
+// A lane's signal: lane 0's are SIG_DATA..SIG_RXSTATUS.
+static size_t lane_sig(unsigned lane, unsigned which) {
+    return lane == 0 ? (size_t)SIG_DATA + which
+                     : (size_t)SIG_LANE0_END + (size_t)(lane - 1u) * LANE_SIGNALS + which;
+}
+
+#define LANE_SIGNAL_SPECS(l, lanes)                                                        \
+    {"data" #l, 8u * (lanes), true}, {"datak" #l, (lanes), true}, {"rxvalid" #l, 1, true}, \
+        {"txelecidle" #l, 1, true}, {                                                      \
+        "rxstatus" #l, 3, true                                                             \
+    }
+
+#define PCIE_SIGNALS(lanes)                                                                        \
+    {                                                                                              \
+        {"pclk", 1, false},           {"data", 8u * (lanes), false}, {"datak", (lanes), false},    \
+        {"rxvalid", 1, true},         {"txelecidle", 1, true},       {"rxstatus", 3, true},        \
+        LANE_SIGNAL_SPECS(1, lanes),  LANE_SIGNAL_SPECS(2, lanes),   LANE_SIGNAL_SPECS(3, lanes),  \
+        LANE_SIGNAL_SPECS(4, lanes),  LANE_SIGNAL_SPECS(5, lanes),   LANE_SIGNAL_SPECS(6, lanes),  \
+        LANE_SIGNAL_SPECS(7, lanes),  LANE_SIGNAL_SPECS(8, lanes),   LANE_SIGNAL_SPECS(9, lanes),  \
+        LANE_SIGNAL_SPECS(10, lanes), LANE_SIGNAL_SPECS(11, lanes),  LANE_SIGNAL_SPECS(12, lanes), \
+        LANE_SIGNAL_SPECS(13, lanes), LANE_SIGNAL_SPECS(14, lanes),  LANE_SIGNAL_SPECS(15, lanes), \
     }
 
 static const wcx_signal_spec k_signals_w8[SIG_COUNT] = PCIE_SIGNALS(1u);
@@ -43,7 +67,31 @@ static const wcx_signal_spec k_signals_w16[SIG_COUNT] = PCIE_SIGNALS(2u);
 static const wcx_signal_spec k_signals_w32[SIG_COUNT] = PCIE_SIGNALS(4u);
 static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
 
-// ── manifests (SPEC.md §2-§3) ──────────────────────────────────────────────
+// ── manifests (SPEC.md §2-§3, §12.1) ───────────────────────────────────────
+
+// The five optional signals of lane l (1-15) of a multi-lane link.
+#define MANIFEST_LANE(l, width, kwidth)                                                           \
+    ",{\"name\":\"data" #l "\",\"bit_width\":" width ",\"description\":\"Lane " #l                \
+    " TxData or RxData, on a multi-lane link\"},"                                                 \
+    "{\"name\":\"datak" #l "\",\"bit_width\":" kwidth ",\"description\":\"Lane " #l               \
+    " TxDataK or RxDataK; bind it with data" #l "\"},"                                            \
+    "{\"name\":\"rxvalid" #l "\",\"bit_width\":1,\"description\":\"Lane " #l " RxValid\"},"       \
+    "{\"name\":\"txelecidle" #l "\",\"bit_width\":1,\"description\":\"Lane " #l " TxElecIdle\"}," \
+    "{\"name\":\"rxstatus" #l "\",\"bit_width\":3,\"description\":\"Lane " #l " RxStatus[2:0]\"}"
+
+#define MANIFEST_PARAM_MAX_SKEW                                                            \
+    "{\"name\":\"max_skew\",\"kind\":\"int\",\"default\":8,"                               \
+    "\"display_name\":\"Max lane skew\","                                                  \
+    "\"description\":\"Multi-lane links: how many symbols apart the lanes' copies of one " \
+    "ordered set may be and still line up (0 to 64)\"}"
+
+#define MANIFEST_PARAM_LANE_ORDER                                                              \
+    "{\"name\":\"lane_order\",\"kind\":\"enum\",\"default\":\"auto\","                         \
+    "\"display_name\":\"Lane order\","                                                         \
+    "\"description\":\"Multi-lane links: Auto takes the logical lane order from the TS1/TS2 "  \
+    "lane numbers, so a reversed link decodes; Physical keeps the order of the bound lanes\"," \
+    "\"enum_values\":[\"auto\",\"physical\"],"                                                 \
+    "\"enum_labels\":{\"auto\":\"From TS1/TS2 lane numbers\",\"physical\":\"Physical\"}}"
 
 #define MANIFEST_SIGNALS(width, kwidth)                                                         \
     "\"signals\":["                                                                             \
@@ -62,7 +110,14 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "clock edges where it is 1 carry no symbols. Unbound means never idle\"},"                  \
     "{\"name\":\"rxstatus\",\"bit_width\":3,\"description\":\"PIPE RxStatus[2:0]. The PIPE "    \
     "decoder annotates SKP add/remove, receiver detection and PHY errors; the Data Link Layer " \
-    "decoder ignores it\"}],"
+    "decoder ignores it\"}" MANIFEST_LANE(1, width, kwidth) MANIFEST_LANE(2, width, kwidth)     \
+        MANIFEST_LANE(3, width, kwidth) MANIFEST_LANE(4, width, kwidth)                         \
+            MANIFEST_LANE(5, width, kwidth) MANIFEST_LANE(6, width, kwidth)                     \
+                MANIFEST_LANE(7, width, kwidth) MANIFEST_LANE(8, width, kwidth)                 \
+                    MANIFEST_LANE(9, width, kwidth) MANIFEST_LANE(10, width, kwidth)            \
+                        MANIFEST_LANE(11, width, kwidth) MANIFEST_LANE(12, width, kwidth)       \
+                            MANIFEST_LANE(13, width, kwidth) MANIFEST_LANE(14, width, kwidth)   \
+                                MANIFEST_LANE(15, width, kwidth) "],"
 
 #define MANIFEST_PARAM_SAMPLE_POINT                                                          \
     "{\"name\":\"sample_point\",\"kind\":\"enum\",\"default\":\"before_edge\","              \
@@ -74,22 +129,33 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "edge\"}}"
 
 #define MANIFEST_PIPE(width, kwidth)                                                          \
-    "{\"description\":\"PCI Express Gen1/Gen2 at the PIPE interface (x1, " width              \
-    "-bit data): TS1/TS2, SKP, FTS, EIOS and EIEOS ordered sets, logical idle, TLP and DLLP " \
-    "framing, symbol errors and RxStatus\","                                                  \
+    "{\"description\":\"PCI Express Gen1/Gen2 at the PIPE interface (x1 to x16, " width       \
+    "-bit data per lane): TS1/TS2, SKP, FTS, EIOS and EIEOS ordered sets, logical idle, TLP " \
+    "and DLLP framing, lane alignment, symbol errors and RxStatus\","                         \
     "\"category\":\"highSpeed\"," MANIFEST_SIGNALS(                                           \
         width, kwidth) "\"parameters\":[" MANIFEST_PARAM_SCRAMBLING                           \
                        "," MANIFEST_PARAM_SAMPLE_POINT "," MANIFEST_PARAM_COALESCE            \
-                       "," MANIFEST_PARAM_SHOW_IDLE "]}"
+                       "," MANIFEST_PARAM_SHOW_IDLE "," MANIFEST_PARAM_MAX_SKEW               \
+                       "," MANIFEST_PARAM_LANE_ORDER "]}"
 
-#define MANIFEST_DLL(width, kwidth)                                                           \
-    "{\"description\":\"PCI Express Gen1/Gen2 Data Link Layer from PIPE symbols (x1, " width  \
-    "-bit data): DLLPs with CRC-16 checks, TLPs with LCRC checks, header names and sequence " \
-    "tracking\","                                                                             \
-    "\"category\":\"highSpeed\"," MANIFEST_SIGNALS(                                           \
-        width, kwidth) "\"parameters\":[" MANIFEST_PARAM_SCRAMBLING                           \
-                       "," MANIFEST_PARAM_SAMPLE_POINT "]}"
+#define MANIFEST_DLL(width, kwidth)                                                       \
+    "{\"description\":\"PCI Express Gen1/Gen2 Data Link Layer from PIPE symbols (x1 to "  \
+    "x16, " width                                                                         \
+    "-bit data per lane): DLLPs with CRC-16 checks, TLPs with LCRC checks, header names " \
+    "and sequence tracking\","                                                            \
+    "\"category\":\"highSpeed\"," MANIFEST_SIGNALS(                                       \
+        width, kwidth) "\"parameters\":[" MANIFEST_PARAM_SCRAMBLING                       \
+                       "," MANIFEST_PARAM_SAMPLE_POINT "," MANIFEST_PARAM_MAX_SKEW        \
+                       "," MANIFEST_PARAM_LANE_ORDER "]}"
 
+// With 15 optional lanes (§12.1) a manifest is about 9 KB, over the 4095
+// characters C17 requires a compiler to accept in one string literal. GCC,
+// Clang and MSVC all take it (MSVC up to 65535 after concatenation); only
+// the pedantic warning is silenced, and only here.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverlength-strings"
+#endif
 static const char k_manifest_pipe_w8[] = MANIFEST_PIPE("8", "1");
 static const char k_manifest_pipe_w16[] = MANIFEST_PIPE("16", "2");
 static const char k_manifest_pipe_w32[] = MANIFEST_PIPE("32", "4");
@@ -98,16 +164,21 @@ static const char k_manifest_dll_w8[] = MANIFEST_DLL("8", "1");
 static const char k_manifest_dll_w16[] = MANIFEST_DLL("16", "2");
 static const char k_manifest_dll_w32[] = MANIFEST_DLL("32", "4");
 static const char k_manifest_dll_w64[] = MANIFEST_DLL("64", "8");
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 // Manifest enum order of `scrambling` matches pcie_scrambling_param.
 static const char *const k_scrambling_values[] = {"auto", "on", "off"};
 static const char *const k_sample_points[] = {"before_edge", "at_edge"};
+static const char *const k_lane_orders[] = {"auto", "physical"};
 
 // ── per-instance state ─────────────────────────────────────────────────────
 
 typedef struct pcie_state {
     unsigned lanes; // symbols per clock: 1, 2, 4 or 8
     bool dll;
+    unsigned bound; // link lanes bound (SPEC.md §12.1); 1: x1, no lane layer
     wcx_edge clk;
     bool have_edge;
     uint64_t prev_edge_fs;
@@ -116,9 +187,72 @@ typedef struct pcie_state {
     uint64_t xz_start_fs;
     uint64_t xz_end_fs;
     uint64_t xz_edges;
-    uint64_t prev_rxstatus; // at the previous rising edge (§4.6)
+    uint64_t prev_rxstatus[PCIE_MAX_LANES]; // at the previous rising edge (§4.6, §12.8)
     pcie_detector det;
+    pcie_lanes ln; // bound > 1
 } pcie_state;
+
+static bool is_link_width(unsigned w) {
+    return w == 1u || w == 2u || w == 4u || w == 8u || w == 12u || w == 16u;
+}
+
+// §12.1: the bound lanes must be 0..B-1, B a link width, each with both its
+// data and datak, and no other lane signal without its data.
+static bool check_lanes(wcx_decoder *d, unsigned *out_bound) {
+    static const char *const k_other[] = {"rxvalid", "txelecidle", "rxstatus"};
+    bool data[PCIE_MAX_LANES] = {true};
+    for (unsigned l = 1; l < PCIE_MAX_LANES; l++) {
+        data[l] = wcx_decoder_is_bound(d, lane_sig(l, LANE_DATA));
+        if (data[l] != wcx_decoder_is_bound(d, lane_sig(l, LANE_DATAK))) {
+            wcx_decoder_fail(d, "datak%u must be bound together with data%u", l, l);
+            return false;
+        }
+        for (unsigned f = 0; f < 3u; f++) {
+            if (!data[l] && wcx_decoder_is_bound(d, lane_sig(l, LANE_RXVALID + f))) {
+                wcx_decoder_fail(d, "%s%u is bound but data%u is not", k_other[f], l, l);
+                return false;
+            }
+        }
+    }
+    char list[96] = {0};
+    size_t at = 0;
+    unsigned count = 0;
+    unsigned missing = PCIE_MAX_LANES;
+    unsigned highest = 0;
+    for (unsigned l = 0; l < PCIE_MAX_LANES; l++) {
+        if (!data[l]) {
+            continue;
+        }
+        char e[WCX_FMT_U64_CAP] = {0};
+        const size_t n = wcx_fmt_u64(e, l);
+        if (at + n + 3u < sizeof list) {
+            if (count > 0) {
+                list[at++] = ',';
+                list[at++] = ' ';
+            }
+            memcpy(list + at, e, n);
+            at += n;
+            list[at] = '\0';
+        }
+        count++;
+        highest = l;
+    }
+    for (unsigned l = 0; l < highest; l++) {
+        if (!data[l] && missing == PCIE_MAX_LANES) {
+            missing = l;
+        }
+    }
+    if (missing != PCIE_MAX_LANES) {
+        wcx_decoder_fail(d, "lanes bound: %s (lane %u is missing)", list, missing);
+        return false;
+    }
+    if (!is_link_width(count)) {
+        wcx_decoder_fail(d, "lanes bound: %s (x%u is not a PCIe link width)", list, count);
+        return false;
+    }
+    *out_bound = count;
+    return true;
+}
 
 // Which class a handle belongs to, and what that means.
 typedef struct pcie_variant {
@@ -151,10 +285,19 @@ static bool pcie_init(wcx_decoder *d, void *state) {
                      !wcx_param_bool(d, "show_idle", false, &show_idle))) {
         return false;
     }
+    int64_t max_skew = 0;
+    size_t order = 0;
+    if (!wcx_param_int(d, "max_skew", 8, 0, PCIE_MAX_SKEW_MAX, &max_skew) ||
+        !wcx_param_enum(d, "lane_order", k_lane_orders, 2, 0, &order) ||
+        !check_lanes(d, &st->bound)) {
+        return false;
+    }
     const wcx_sample_point sp = point == 1 ? WCX_SAMPLE_AT_EDGE : WCX_SAMPLE_BEFORE_EDGE;
     if (!wcx_edge_init(&st->clk, wcx_decoder_layout(d), SIG_PCLK, sp) ||
         !pcie_detector_init(&st->det, d, (pcie_scrambling_param)scrambling, st->dll, coalesce,
-                            show_idle)) {
+                            show_idle) ||
+        (st->bound > 1u && !pcie_lanes_init(&st->ln, d, &st->det, st->bound, st->lanes,
+                                            (unsigned)max_skew, order == 0, st->dll))) {
         wcx_decoder_fail(d, "out of memory starting the decoder"); /* defensive: allocation */
         return false;
     }
@@ -166,6 +309,7 @@ static void pcie_fini(wcx_decoder *d, void *state) {
     pcie_state *st = state;
     wcx_edge_free(&st->clk);
     pcie_detector_free(&st->det);
+    pcie_lanes_free(&st->ln);
 }
 
 // ── edge-level transactions ────────────────────────────────────────────────
@@ -211,9 +355,10 @@ typedef struct edge_times {
     uint64_t end_fs;
 } edge_times;
 
-// §4.6: at an ungated edge where rxstatus is non-zero and changed.
-static void rxstatus_event(pcie_state *st, uint64_t code, const edge_times *e) {
-    if (code == 0 || code == st->prev_rxstatus || code > 7u) {
+// §4.6: at an ungated edge where a lane's rxstatus is non-zero and changed.
+// With several lanes bound, the label and fields name the lane (§12.8).
+static void rxstatus_event(pcie_state *st, unsigned lane, uint64_t code, const edge_times *e) {
+    if (code == 0 || code == st->prev_rxstatus[lane] || code > 7u) {
         return;
     }
     const char bits[6] = {'0',
@@ -223,14 +368,20 @@ static void rxstatus_event(pcie_state *st, uint64_t code, const edge_times *e) {
                           (code & 1u) != 0 ? '1' : '0',
                           '\0'};
     const rxstatus_code *rc = &k_rxstatus[code];
+    wcx_arena *a = pcie_detector_arena(&st->det);
     wcx_json j;
-    wcx_json_begin(&j, pcie_detector_arena(&st->det));
+    wcx_json_begin(&j, a);
     wcx_json_add_str(&j, "type", "rxstatus");
     wcx_json_add_str(&j, "code", bits);
+    if (st->bound > 1u) {
+        wcx_json_add_u64(&j, "lane", lane);
+    }
     if (rc->error != NULL) {
         wcx_json_add_str(&j, "error", rc->error);
     }
-    pcie_detector_emit(&st->det, e->start_fs, e->end_fs, rc->label, wcx_json_end(&j),
+    const char *label =
+        st->bound > 1u ? wcx_arena_printf(a, "%s (lane %u)", rc->label, lane) : rc->label;
+    pcie_detector_emit(&st->det, e->start_fs, e->end_fs, label, wcx_json_end(&j),
                        rc->error != NULL);
 }
 
@@ -250,16 +401,62 @@ static bool sideband(const wcx_decoder *d, const uint8_t *at, size_t sig, bool d
     return level;
 }
 
-static uint64_t rxstatus_value(const wcx_decoder *d, const uint8_t *at) {
-    if (!wcx_decoder_is_bound(d, SIG_RXSTATUS)) {
+static uint64_t rxstatus_value(const wcx_decoder *d, const uint8_t *at, size_t sig) {
+    if (!wcx_decoder_is_bound(d, sig)) {
         return 0;
     }
     uint64_t value = 0;
     bool unknown = false;
-    if (!wcx_sample_read(wcx_decoder_layout(d), at, SIG_RXSTATUS, &value, &unknown) || unknown) {
+    if (!wcx_sample_read(wcx_decoder_layout(d), at, sig, &value, &unknown) || unknown) {
         return 0; // X/Z: no event (SPEC.md is silent; treated as code 000)
     }
     return value;
+}
+
+// §4.3 for one lane: whether its own rxvalid or txelecidle gates the edge.
+static bool lane_gated(const wcx_decoder *d, const uint8_t *at, unsigned lane,
+                       pcie_break_reason *why) {
+    if (!sideband(d, at, lane_sig(lane, LANE_RXVALID), true)) {
+        *why = PCIE_BREAK_RXVALID;
+        return true;
+    }
+    if (sideband(d, at, lane_sig(lane, LANE_TXELECIDLE), false)) {
+        *why = PCIE_BREAK_TXELECIDLE;
+        return true;
+    }
+    return false;
+}
+
+// §12: a multi-lane link. Each lane is sampled on its own; the lane layer
+// does the rest, X/Z included.
+static void sample_lanes(pcie_state *st, const wcx_decoder *d, const uint8_t *at,
+                         const edge_times *e) {
+    const wcx_layout *layout = wcx_decoder_layout(d);
+    pcie_lane_in in[PCIE_MAX_LANES];
+    memset(in, 0, sizeof in);
+    for (unsigned l = 0; l < st->bound && l < PCIE_MAX_LANES; l++) {
+        const uint64_t rxstatus = rxstatus_value(d, at, lane_sig(l, LANE_RXSTATUS));
+        pcie_break_reason why = PCIE_BREAK_RXVALID;
+        if (lane_gated(d, at, l, &why)) {
+            in[l].gap = true;
+            in[l].gap_kind = why;
+        } else {
+            if (!st->dll) {
+                rxstatus_event(st, l, rxstatus, e);
+            }
+            bool data_x = false;
+            bool datak_x = false;
+            WCX_IGNORE(wcx_sample_read(layout, at, lane_sig(l, LANE_DATA), &in[l].data, &data_x));
+            WCX_IGNORE(
+                wcx_sample_read(layout, at, lane_sig(l, LANE_DATAK), &in[l].datak, &datak_x));
+            if (data_x || datak_x) {
+                in[l].gap = true;
+                in[l].gap_kind = PCIE_BREAK_UNKNOWN;
+            }
+        }
+        st->prev_rxstatus[l] = rxstatus;
+    }
+    pcie_lanes_edge(&st->ln, in, e->start_fs, e->period_fs);
 }
 
 static void feed_symbols(pcie_state *st, const uint8_t *at, const edge_times *e) {
@@ -285,6 +482,7 @@ static void feed_symbols(pcie_state *st, const uint8_t *at, const edge_times *e)
     const uint64_t duration = pcie_symbol_duration(e->period_fs, st->lanes);
     for (unsigned lane = 0; lane < st->lanes; lane++) {
         pcie_sym s;
+        memset(&s, 0, sizeof s);
         s.byte = (uint8_t)((data >> (8u * lane)) & 0xFFu);
         s.k = ((datak >> lane) & 1u) != 0;
         s.start_fs = pcie_symbol_start(e->start_fs, e->period_fs, lane, st->lanes);
@@ -308,33 +506,37 @@ static void pcie_sample(wcx_decoder *d, void *state, const wcx_sample *s) {
     st->have_edge = true;
     st->prev_edge_fs = e.start_fs;
     const uint8_t *at = wcx_edge_data(&st->clk);
-    const uint64_t rxstatus = rxstatus_value(d, at);
+    if (st->bound > 1u) {
+        sample_lanes(st, d, at, &e);
+        return;
+    }
+    const uint64_t rxstatus = rxstatus_value(d, at, SIG_RXSTATUS);
 
     // §4.3: gating.
     pcie_break_reason why = PCIE_BREAK_RXVALID;
-    bool gated = !sideband(d, at, SIG_RXVALID, true);
-    if (!gated && sideband(d, at, SIG_TXELECIDLE, false)) {
-        gated = true;
-        why = PCIE_BREAK_TXELECIDLE;
-    }
+    const bool gated = lane_gated(d, at, 0, &why);
     if (gated) {
         close_xz_run(st);
         pcie_detector_break(&st->det, why);
     } else {
         if (!st->dll) {
-            rxstatus_event(st, rxstatus, &e);
+            rxstatus_event(st, 0, rxstatus, &e);
         }
         feed_symbols(st, at, &e);
     }
-    st->prev_rxstatus = rxstatus;
+    st->prev_rxstatus[0] = rxstatus;
 }
 
 // SPEC.md §10.6: what the pipelines hold (ordered set, coalesced runs, open
-// packet, stray run), then an X/Z run, then an undecided `auto` locks.
+// packet, stray run), then an X/Z run, then an undecided `auto` locks. On a
+// multi-lane link the lanes are emptied first (§12.13).
 // cppcheck-suppress constParameterCallback ; wcx_decoder_class fixes the callback signature
 static void pcie_flush(wcx_decoder *d, void *state) {
     pcie_state *st = state;
     pcie_detector_begin_call(&st->det);
+    if (st->bound > 1u) {
+        pcie_lanes_flush(&st->ln);
+    }
     pcie_detector_end_of_trace(&st->det);
     close_xz_run(st);
     pcie_detector_finish(&st->det, wcx_decoder_now(d));
@@ -343,11 +545,18 @@ static void pcie_flush(wcx_decoder *d, void *state) {
 // ── the eight classes ──────────────────────────────────────────────────────
 
 // Transactions one call can produce: a lock emits a whole buffer
-// (PCIE_AUTO_LOCK_TRANSACTIONS, SPEC.md §5.5) plus its info transaction; the
-// same edge can also end an X/Z run (1), carry an RxStatus (1) and complete
-// up to 8 symbols at 2 transactions each (16). 4096 + 32 covers that with
-// room to spare.
-#define PCIE_MAX_TX_PER_CALL (PCIE_AUTO_LOCK_TRANSACTIONS + 32u)
+// (PCIE_AUTO_LOCK_TRANSACTIONS, SPEC.md §5.5) plus its info transaction. An
+// x1 edge adds at most 18 (an X/Z run, an RxStatus, 8 symbols at 2 each). A
+// multi-lane edge can release the rows the lanes held back (§12.4): a lane
+// holds at most max_skew + 17 + 8 + 16 symbol times (105), so at most 105
+// rows of 16 symbols at 2 transactions each (3360), plus 16 RxStatus and a
+// round's few lane-level transactions. 4096 more covers that.
+#define PCIE_MAX_TX_PER_CALL (PCIE_AUTO_LOCK_TRANSACTIONS + 4096u)
+
+// Strings for those transactions: under 600 bytes each (a TLP with every
+// suffix and error sentence), so 1 KiB each bounds the worst call.
+#define PCIE_ARENA_MAX   ((size_t)PCIE_MAX_TX_PER_CALL * 1024u)
+#define PCIE_ARENA_BLOCK ((size_t)64u * 1024u)
 
 #define PCIE_CLASS(ident, id_str, name_str, manifest, sigs)          \
     static WcDecoderHandle ident##_create(const char *config_json);  \
@@ -359,6 +568,8 @@ static void pcie_flush(wcx_decoder *d, void *state) {
         .signal_count = SIG_COUNT,                                   \
         .state_size = sizeof(pcie_state),                            \
         .max_transactions_per_call = PCIE_MAX_TX_PER_CALL,           \
+        .arena_block_bytes = PCIE_ARENA_BLOCK,                       \
+        .arena_max_bytes = PCIE_ARENA_MAX,                           \
         .init = pcie_init,                                           \
         .on_sample = pcie_sample,                                    \
         .on_flush = pcie_flush,                                      \
