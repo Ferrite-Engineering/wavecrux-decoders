@@ -1,0 +1,21 @@
+{
+  "decoder": "ferrite.pcie_pipe_w32",
+  "signal_bindings": {
+    "pclk": "tb.dut.pclk",
+    "data": "tb.dut.RxData",
+    "datak": "tb.dut.RxDataK",
+    "rxstatus": "tb.dut.RxStatus",
+    "data1": "tb.dut.RxData1",
+    "datak1": "tb.dut.RxDataK1",
+    "rxstatus1": "tb.dut.RxStatus1",
+    "data2": "tb.dut.RxData2",
+    "datak2": "tb.dut.RxDataK2",
+    "rxstatus2": "tb.dut.RxStatus2",
+    "data3": "tb.dut.RxData3",
+    "datak3": "tb.dut.RxDataK3",
+    "rxstatus3": "tb.dut.RxStatus3"
+  },
+  "parameters": {
+    "scrambling": "off"
+  }
+}

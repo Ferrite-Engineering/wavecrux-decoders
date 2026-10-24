@@ -26,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import pcie_fixture_lib as L  # noqa: E402
+import pcie_multilane_lib as M  # noqa: E402
 from pcie_fixture_lib import (COM, EDB, EIE, END, FTS, IDL, PAD, SDP, SKP, STP,  # noqa: E402
                               Clocking, Dllp, Stream, Tlp, VcdNames)
 
@@ -1542,6 +1543,692 @@ def make_link(fx: LinkFixture) -> dict[str, str]:
     return files
 
 
+# ── multi-lane links (SPEC §12) ──────────────────────────────────────────────
+#
+# Per-lane buses data/datak, data1/datak1, ... named like a PIPE dump
+# (TxData, TxDataK, TxData1, ...). The transmitter (pcie_multilane_lib.Link)
+# stripes the packet layer over the logical lanes and sends every ordered set
+# on every lane; the expectations apply SPEC §12 to what it put on each lane.
+
+@dataclass
+class MlFixture:
+    name: str
+    proves: str
+    decoder: str
+    n: int                      # symbols per pclk edge (PIPE width / 8)
+    bound: int                  # lanes bound
+    build: object
+    clk: Clocking
+    direction: str = "tx"
+    side: dict = field(default_factory=dict)   # sideband -> lanes dumped and bound
+    params: dict = field(default_factory=dict)
+    scrambled: bool = False
+    skew: list | None = None
+    hand: dict | None = None
+
+
+def multilane(name: str, proves: str, kind: str, n: int, bound: int, clk: Clocking, direction: str = "tx",
+              side: dict | None = None, params: dict | None = None, scrambled: bool = False,
+              skew: list | None = None, hand: dict | None = None):
+    def wrap(fn):
+        FIXTURES.append(MlFixture(name, proves, f"ferrite.pcie_{kind}_w{8 * n}", n, bound, fn, clk, direction,
+                                  side or {}, params or {}, scrambled, skew, hand))
+        return fn
+    return wrap
+
+
+ALL4 = [0, 1, 2, 3]
+
+
+def dl_init(lk: M.Link) -> None:
+    """InitFC1 then InitFC2 for P, NP and Cpl (8 symbols each)."""
+    for k, h, d in (("p", 32, 1008), ("np", 32, 1), ("cpl", 0, 0)):
+        lk.log.dllp(Dllp(f"initfc1_{k}", hdr=h, data=d))
+    for k, h, d in (("p", 32, 1008), ("np", 32, 1), ("cpl", 0, 0)):
+        lk.log.dllp(Dllp(f"initfc2_{k}", hdr=h, data=d))
+
+
+# 1. Striping, x2 to x16, after training.
+
+# x2 after Polling -> Configuration -> TS2 run: DLLPs and TLPs striped over two lanes, a SKP between them.
+@multilane("pipe_x2_stripe_w8_1ns", "x2 training (TS lists), link width and lock, DLLP/TLP frames striped over 2 lanes",
+           "pipe", 1, 2, Clocking((1, "ns"), period=8), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(4)
+    for k, h, d in (("p", 32, 1008), ("np", 32, 1), ("cpl", 0, 0)):
+        lk.log.dllp(Dllp(f"initfc1_{k}", hdr=h, data=d))
+    lk.idle_rows(2)
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=201))
+    lk.log.tlp(Tlp("MRd32", 1, rng_seed=202))
+    lk.log.dllp(Dllp("ack", seq=1))
+    lk.idle_rows(2)
+    lk.skp()
+    lk.idle_rows(3)
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.idle_rows(4)
+
+
+# x4, 32-bit PIPE, data changing between edges; default auto locks off at the first DLLP; nullified TLP.
+@multilane("dll_x4_stripe_w32_1ps", "x4 striping on the DLL decoder: DL init, TLPs, Ack/Nak, nullified TLP; auto locks off",
+           "dll", 4, 4, Clocking((1, "ps"), period=16000, change="delay", delay=3000))
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    dl_init(lk)
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=211))
+    lk.log.tlp(Tlp("MRd64", 1, length_dw=4, tc=2, rng_seed=212))
+    lk.log.tlp(Tlp("CplD", 2, length_dw=3, rng_seed=213))
+    lk.log.dllp(Dllp("ack", seq=2))
+    lk.idle_rows(1)
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.tlp(Tlp("MWr64", 3, length_dw=8, tc=7, rng_seed=214))
+    lk.log.tlp(Tlp("MWr32", 4, length_dw=1, rng_seed=215), lcrc="invert", end=EDB)
+    lk.log.dllp(Dllp("nak", seq=3))
+    lk.idle_rows(3)
+
+
+# x8: a packet ending on lane 3 is followed back to back by one starting on lane 4; PAD fill to the row end.
+@multilane("pipe_x8_stripe_w16_10ps", "x8 striping: back-to-back starts on lane 4, PAD fill after END, no framing errors",
+           "pipe", 2, 8, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))     # one full row
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=221))             # 20 symbols: ends on lane 3
+    lk.log.dllp(Dllp("ack", seq=0))                       # lanes 4-7, 0-3
+    lk.fill()                                             # PAD on lanes 4-7
+    lk.log.tlp(Tlp("MWr32", 1, length_dw=2, rng_seed=222))  # 28 symbols: ends on lane 3
+    lk.log.tlp(Tlp("MRd32", 2, rng_seed=223))             # starts on lane 4, ends on lane 7
+    lk.log.dllp(Dllp("updatefc_np", hdr=4, data=40))
+    lk.log.tlp(Tlp("MRd32", 3, rng_seed=224))             # ends on lane 3
+    lk.fill()
+    lk.idle_rows(1)
+    lk.skp()
+    lk.idle_rows(1)
+    lk.log.dllp(Dllp("ack", seq=3))
+    lk.idle_rows(2)
+
+
+# x16 on a 64-bit PIPE (8 rows per edge): starts on lanes 0, 4, 8, 12; PAD fill; data changing between edges.
+@multilane("dll_x16_stripe_w64_1ns", "x16 striping on the DLL decoder: starts on lanes 4k, PAD fill, 8 rows per pclk edge",
+           "dll", 8, 16, Clocking((1, "ns"), period=32, change="delay", delay=5))
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(1)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))     # lanes 0-7
+    lk.log.dllp(Dllp("initfc1_np", hdr=32, data=1))       # lanes 8-15
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=231))             # 20: ends on lane 3
+    lk.log.dllp(Dllp("initfc1_cpl"))                      # lanes 4-11
+    lk.log.dllp(Dllp("ack", seq=0))                       # lanes 12-15, 0-3
+    lk.log.tlp(Tlp("MWr32", 1, length_dw=1, rng_seed=232))  # 24 from lane 4: ends on lane 11
+    lk.fill()                                             # PAD on lanes 12-15
+    lk.log.tlp(Tlp("MWr64", 2, length_dw=8, rng_seed=233))  # 56: ends on lane 7
+    lk.log.dllp(Dllp("ack", seq=2))                       # lanes 8-15
+    lk.skp()
+    lk.log.dllp(Dllp("updatefc_p", hdr=10, data=200))
+    lk.fill()                                             # PAD on lanes 8-15
+    lk.idle_rows(2)
+
+
+# 2. Skew.
+
+# Lanes delayed by 1, 0, 8 and 4 symbols (max_skew 8): one lock with those offsets; lane 0's filler is withheld data.
+@multilane("pipe_x4_skew_w16_1ps", "fixed per-lane skew up to max_skew: lock with offsets 1,0,8,4; rows pair by item, not index",
+           "pipe", 2, 4, Clocking((1, "ps"), period=8000, change="delay", delay=2500), params={"scrambling": "off"},
+           skew=[1, 0, 8, 4])
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=241))
+    lk.idle_rows(1)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(10)
+
+
+# After lock, lane 3 runs 9 symbols ahead (> max_skew 8): loss at the row, then no round ever completes again.
+@multilane("pipe_x4_skew_over_w8_10ps", "skew beyond max_skew: lane_skew at the row, no re-lock, data after it withheld as an error run",
+           "pipe", 1, 4, Clocking((10, "ps"), period=400), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(10)
+    lk.lane_drop(3, 9)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=1))
+    lk.idle_rows(22)
+    lk.skp()
+    lk.idle_rows(12)
+
+
+# 3. SKP counts per lane.
+
+# Lane 2's elastic buffer removes a SKP (RxStatus 010) then adds one (001): SKP x3,3,2,3 and x3,3,4,3, offsets move and return.
+@multilane("pipe_x4_skp_counts_w32_1ns", "per-lane SKP counts in the label; offsets at COM; RxStatus per lane with (lane 2)",
+           "pipe", 4, 4, Clocking((1, "ns"), period=16), direction="rx", side={"rxstatus": ALL4},
+           params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(4)
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=251))
+    lk.rxstatus(2, 2)
+    lk.skp([3, 3, 2, 3])
+    lk.idle_rows(5)            # lane 2 is on an edge boundary again
+    lk.rxstatus(2, 0)
+    lk.log.dllp(Dllp("ack", seq=1))
+    lk.idle_rows(2)
+    lk.rxstatus(2, 1)
+    lk.skp([3, 3, 4, 3])
+    lk.idle_rows(3)
+    lk.rxstatus(2, 0)
+    lk.log.tlp(Tlp("MRd32", 1, rng_seed=252))
+    lk.idle_rows(3)
+    lk.skp()
+    lk.idle_rows(4)
+
+
+# 4. Reversed lanes.
+
+REV_DLLP1 = Dllp("initfc1_p", hdr=32, data=1008)
+REV_DLLP2 = Dllp("ack", seq=5)
+
+
+def reversed_body(lk: M.Link) -> None:
+    M.train(lk, order=[3, 2, 1, 0])
+    lk.idle_rows(4)
+    lk.log.dllp(REV_DLLP1)
+    lk.idle_rows(2)
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.dllp(REV_DLLP2)
+    lk.idle_rows(4)
+
+
+def _rev_rows(V: Stream, d: Dllp, idle_before: int, idle_after: int) -> None:
+    """lane_order=physical on a reversed x4: each fed row is the transmitter's
+    row backwards. [SDP b0 b1 b2][b3 c0 c1 END] arrives as [b2 b1 b0 SDP]
+    [END c1 c0 b3]: data, a DLLP with an empty body started on lane 3, data."""
+    b = d.bytes4() + L.dllp_crc_wire(d.bytes4())
+    head, tail = [b[2], b[1], b[0]], [b[5], b[4], b[3]]
+    lead = 0
+    while head and head[0] == 0:     # leading zeros are logical idle
+        head.pop(0)
+        lead += 1
+    V.idle(idle_before + lead)
+    if head:
+        V.stray(bytes(head))
+    u = V.raw_dllp_bytes(b"")
+    u.info["wrong_lane"] = True
+    V.stray(bytes(tail))
+    V.idle(idle_after)
+
+
+# Lane# 3,2,1,0 on physical lanes 0-3: lane_order=auto de-stripes by Lane#: Lane order 3,2,1,0, packets intact.
+@multilane("pipe_x4_reversed_w16_10ps", "reversed Lane# in TS1/TS2: Lane order 3,2,1,0, link lanes 3,2,1,0, packets decode",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800, change="delay", delay=300), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    reversed_body(lk)
+
+
+# The same trace with lane_order=physical: rows de-striped backwards: data, SDP on lane 3, empty DLLPs.
+@multilane("pipe_x4_reversed_physical_w16_10ps", "the same reversed trace with lane_order=physical: no lane_order, rows read backwards",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800, change="delay", delay=300),
+           params={"scrambling": "off", "lane_order": "physical"},
+           hand={0: lambda V: _rev_rows(V, REV_DLLP1, 16, 8), 1: lambda V: _rev_rows(V, REV_DLLP2, 8, 16)})
+def _(lk: M.Link) -> None:
+    reversed_body(lk)
+
+
+# 5. A lane loses an ordered set; a lane gated mid-packet.
+
+# Lane 2's SKP COM arrives as EDB (decode error): loss at that row; the other lanes are at their SKP (the norm), so
+# lane_skew names lane 2 and spans its EDB; data withheld from that row until the next SKP re-locks.
+@multilane("pipe_x4_os_loss_w8_1ps", "a lane misses one SKP OS: lane_skew (lane 2) at the row, error unaligned run, re-lock at the next SKP",
+           "pipe", 1, 4, Clocking((1, "ps"), period=4000), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.idle_rows(2)
+    lk.skp(per={2: [(EDB, True), (SKP, True), (SKP, True), (SKP, True)]})
+    lk.idle_rows(3)
+    lk.log.dllp(Dllp("ack", seq=0))     # withheld
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.idle_rows(3)
+
+
+# RxValid1 drops for two edges inside a TLP: loss at that row, the open TLP is truncated by the next COM.
+@multilane("dll_x4_lane_gated_w16_1ns", "one lane gated mid-packet: lane_skew spanning its gap, TLP truncated by COM, re-lock",
+           "dll", 2, 4, Clocking((1, "ns"), period=8), direction="rx", side={"rxvalid": ALL4})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.lane_gap(1, "rxvalid", 2, after_rows=2)
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=4, rng_seed=261))
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(2)
+
+
+# 6. Framing on a row.
+
+# x8: STP on lane 2 and SDP on lane 6 (still framed), PAD in an idle row and PAD opening a row: pad_misplaced.
+@multilane("pipe_x8_framing_w16_1ps", "framing_lane (STP lane 2, SDP lane 6) with the frames still decoded; pad_misplaced; PAD fill",
+           "pipe", 2, 8, Clocking((1, "ps"), period=8000, change="delay", delay=1000), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=271))             # ends on lane 3
+    lk.log.dllp(Dllp("ack", seq=0))                       # lane 4: allowed
+    lk.fill()
+    lk.at(2)
+    lk.log.tlp(Tlp("MWr32", 1, length_dw=1, rng_seed=272)).info["wrong_lane"] = True   # ends on lane 1
+    lk.fill()
+    lk.at(6)
+    lk.log.dllp(Dllp("ack", seq=1)).info["wrong_lane"] = True                          # ends on lane 5
+    lk.fill()
+    lk.at(5)
+    lk.pad_misplaced()                                    # PAD in an idle row
+    lk.row_end()
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))       # a full row
+    lk.pad_misplaced()                                    # PAD opening the next row
+    lk.row_end()
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# x4 on the DLL decoder: SDP on lane 2, STP on lane 1 (decoded, framing_lane each), PAD fill after them, a misplaced PAD.
+@multilane("dll_x4_framing_w8_10ps", "framing_lane and pad_misplaced on the DLL decoder (x4); auto locks off",
+           "dll", 1, 4, Clocking((10, "ps"), period=400))
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.at(2)
+    lk.log.dllp(Dllp("ack", seq=0)).info["wrong_lane"] = True   # ends on lane 1
+    lk.fill()
+    lk.at(3)
+    lk.pad_misplaced()
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=281))
+    lk.at(1)
+    lk.log.tlp(Tlp("MRd32", 1, rng_seed=282)).info["wrong_lane"] = True     # ends on lane 0
+    lk.fill()
+    lk.idle_rows(1)
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# 7. Scrambling.
+
+# scrambling=on: every lane has its own LFSR (reset by its COM, SKP does not advance it); TS symbols bypass.
+@multilane("dll_x4_scrambled_on_w16_1ps", "scrambling=on: per-lane descramblers, SKP not advancing them, TS bypass",
+           "dll", 2, 4, Clocking((1, "ps"), period=8000, change="delay", delay=2000),
+           params={"scrambling": "on"}, scrambled=True)
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(4)
+    dl_init(lk)
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=2, rng_seed=291))
+    lk.idle_rows(1)
+    lk.skp()
+    lk.idle_rows(3)
+    lk.log.tlp(Tlp("MRd32", 1, rng_seed=292))
+    lk.log.dllp(Dllp("ack", seq=1))
+    lk.idle_rows(2)
+
+
+# auto on a scrambled x8: locks on at the first DLLP; lane-level transactions before it come out of both buffers.
+@multilane("pipe_x8_auto_on_w32_1ns", "auto locks on (per-lane descrambling) on x8; lane-level transactions before the lock kept",
+           "pipe", 4, 8, Clocking((1, "ns"), period=16), scrambled=True)
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=301))
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.fill()
+    lk.skp()
+    lk.idle_rows(1)
+    lk.log.tlp(Tlp("MWr32", 1, length_dw=1, rng_seed=302))
+    lk.idle_rows(2)
+
+
+# 8. An x4 binding trains narrower.
+
+# Lanes 2-3 go to electrical idle (TxElecIdle2/3) after Polling: Link width x2 (4 bound), '-' in the lists.
+@multilane("pipe_x4_to_x2_elecidle_w16_1ns", "x4 bound, x2 trained: unused lanes in electrical idle, '-' entries, link x2",
+           "pipe", 2, 4, Clocking((1, "ns"), period=8, change="delay", delay=3), side={"txelecidle": ALL4},
+           params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=2)
+    lk.die(2, "txelecidle")
+    lk.die(3, "txelecidle")
+    M.train(lk, order=[0, 1], polling=0)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=311))
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(2)
+
+
+# Lanes 1-3 carry X for the whole trace: an x1 link on lane 0; X on lanes other than the reference makes no X/Z row.
+@multilane("dll_x4_to_x1_xz_w8_1ps", "x4 bound, x1 trained, lanes 1-3 X: x1 link, packets decode, no X/Z transaction",
+           "dll", 1, 4, Clocking((1, "ps"), period=4000, change="delay", delay=1000))
+def _(lk: M.Link) -> None:
+    for p in (1, 2, 3):
+        lk.die(p, "unknown")
+    M.train(lk, order=[0])
+    lk.idle_rows(3)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=321))
+    lk.idle_rows(1)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(3)
+
+
+# Lanes 2-3 answer Configuration with PAD Link#/Lane#: TS2 links=0,0,PAD,PAD lanes=0,1,PAD,PAD, link x2.
+@multilane("pipe_x4_to_x2_pad_w32_10ps", "x4 bound, x2 trained: lanes 2-3 PAD in TS1/TS2, then ignored (their SKPs shown as -)",
+           "pipe", 4, 4, Clocking((10, "ps"), period=1600), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk, order=[0, 1])
+    lk.idle_rows(4)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=331))
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(4)
+
+
+# 9. A lane drops out during Configuration.
+
+# Lane 3 goes idle mid-Configuration; TS2 numbers lanes 0-2: x3 is no link width, so x2 and lane 2 is cut (lane_skew).
+@multilane("pipe_x4_lane_dropout_w16_10ps", "lane 3 drops out in Configuration: TS2 on 3 lanes gives x2, lane_skew for the cut lane 2",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800, change="delay", delay=200), side={"txelecidle": ALL4},
+           params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=2)
+    lk.ts("ts1", 0, None, count=1)
+    lk.die(3, "txelecidle")
+    lk.order = [0, 1, 2]                 # Lane# 0-2 on the lanes left
+    lk.ts("ts1", "link", "order", count=2)
+    lk.ts("ts2", "link", "order", count=3)
+    lk.set_link([0, 1])
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=341))
+    lk.skp()
+    lk.idle_rows(3)
+
+
+# 10. Link#/Lane# differing across lanes.
+
+# Configuration assigns Link# to lanes 0-1 first, then all; Lane# 0-1 first: links=0,0,PAD,PAD and no lane_mismatch.
+@multilane("pipe_x4_config_lists_w8_1ns", "Link#/Lane# that differ across lanes: links=/lanes= lists, never a lane_mismatch",
+           "pipe", 1, 4, Clocking((1, "ns"), period=8), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=2)
+    lk.ts("ts1", [0, 0, None, None], None, count=1)
+    lk.ts("ts1", 0, None, count=1)
+    lk.ts("ts1", 0, [0, 1, None, None], count=1)
+    lk.ts("ts1", 0, "order", count=2)
+    lk.ts("ts2", 0, [0, 1, None, None], count=1)
+    lk.ts("ts2", 0, "order", count=3)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# 11. A trace that starts in L0.
+
+# No TS2: the packets before the first SKP are one non-error unaligned run; the first SKP decides the link.
+@multilane("pipe_x4_l0_start_w32_10ps", "trace starting in L0: 'Packet data before lane alignment', Link width x4 (4 bound, from SKP)",
+           "pipe", 4, 4, Clocking((10, "ps"), period=1600, change="delay", delay=500))
+def _(lk: M.Link) -> None:
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("ack", seq=7))
+    lk.log.tlp(Tlp("MWr32", 8, length_dw=1, rng_seed=351))
+    lk.idle_rows(1)
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.log.tlp(Tlp("MRd32", 9, rng_seed=352))
+    lk.skp()
+    lk.idle_rows(3)
+
+
+# The capture starts inside lane 3's first SKP OS (its COM fell before the trace): the first SKP has 3 lanes, so a
+# provisional x2 (lane 2 cut by the width rule); the next SKP, on all 4 lanes, widens the link to x4.
+@multilane("pipe_x4_l0_partial_skp_w16_1ns", "L0 start inside lane 3's first SKP: provisional x2 from SKP, widened to x4 at the next SKP",
+           "pipe", 2, 4, Clocking((1, "ns"), period=8), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.skp(per={3: [(SKP, True)] * 3})
+    lk.idle_rows(12)                     # idle only while the link is the provisional x2; > max_skew apart
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=371))
+    lk.skp()
+    lk.idle_rows(3)
+
+
+# X on lane 2 for one edge inside a TLP: loss at that row (lane 2 named), a break of kind unknown drops the TLP silently.
+@multilane("pipe_x4_loss_mid_packet_w32_10ps", "loss mid-packet: lane_skew (lane 2), the open TLP dropped by the loss's unknown break, re-lock",
+           "pipe", 4, 4, Clocking((10, "ps"), period=1600, change="delay", delay=400), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(4)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.lane_gap(2, "unknown", 1, after_rows=2)
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=4, rng_seed=381))
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(2)
+
+
+# x12: starts on lanes 0, 4 and 8, PAD fill.
+@multilane("dll_x12_stripe_w16_1ps", "x12 striping: starts on lanes 0, 4 and 8, PAD fill, no framing errors",
+           "dll", 2, 12, Clocking((1, "ps"), period=8000, change="delay", delay=1500))
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(1)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))     # lanes 0-7
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=391))             # from lane 8: ends on lane 3
+    lk.log.dllp(Dllp("ack", seq=0))                       # lanes 4-11
+    lk.log.tlp(Tlp("MWr32", 1, length_dw=1, rng_seed=392))  # two full rows
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))       # lanes 0-7
+    lk.fill()                                             # PAD on lanes 8-11
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# max_skew=0: zero skew locks; then lane 3 runs one symbol ahead and no round pairs it again.
+@multilane("pipe_x4_max_skew0_w8_1ns", "max_skew=0: lock at zero skew; one symbol of skew is a loss with no re-lock",
+           "pipe", 1, 4, Clocking((1, "ns"), period=4), params={"scrambling": "off", "max_skew": 0})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.idle_rows(2)
+    lk.lane_drop(3, 1)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(3)
+
+
+# max_skew=64: lanes delayed 0, 20, 40 and 64 symbols still pair TS by TS and lock with those offsets.
+@multilane("pipe_x4_max_skew64_w64_1ps", "max_skew=64: skews 0,20,40,64 lock with those offsets; rows pair by item",
+           "pipe", 8, 4, Clocking((1, "ps"), period=32000), params={"scrambling": "off", "max_skew": 64},
+           skew=[0, 20, 40, 64])
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=401))
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(72)
+
+
+# Trained reversed, then retrained with physical Lane#: link_width and Lane order 0,1,2,3 (back to physical).
+@multilane("pipe_x4_reorder_w16_1ps", "lane_order back to physical: reversed link retrained with Lane# 0-3 emits Lane order 0,1,2,3",
+           "pipe", 2, 4, Clocking((1, "ps"), period=8000), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk, order=[3, 2, 1, 0])
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.idle_rows(2)
+    M.train(lk, order=[0, 1, 2, 3], polling=0)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# Coalescing compares the round's symbols 1-15 and the lists only: lane 3's Lane# alone splits a TS1 run;
+# lane 2's N_FTS (not in the lists) does not split the TS2 run, it is one lane_mismatch.
+@multilane("pipe_x4_coalesce_lists_w8_10ps", "coalescing with per-lane lists: a list change splits a run, another lane's N_FTS does not",
+           "pipe", 1, 4, Clocking((10, "ps"), period=400), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=2)
+    lk.ts("ts1", 0, "order", count=2)
+    lk.ts("ts1", 0, [0, 1, 2, None], count=2)
+    lk.ts("ts2", 0, "order", count=4, per={2: dict(n_fts=40)})
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# Width cut: TS2 numbers lanes 0-2 and lane 3 answers PAD: x3 is no link width, so x2 and lane_skew for lane 2.
+@multilane("dll_x4_width_cut_w32_1ns", "width rule on the DLL decoder: TS2 on 3 of 4 lanes gives x2 and lane_skew (lane 2)",
+           "dll", 4, 4, Clocking((1, "ns"), period=16, change="delay", delay=4))
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=2)
+    lk.order = [0, 1, 2]                 # Lane# 0-2; lane 3 keeps PAD
+    lk.ts("ts1", "link", None, count=1)
+    lk.ts("ts1", "link", "order", count=2)
+    lk.ts("ts2", "link", "order", count=3)
+    lk.set_link([0, 1])
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=411))
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# L0 start, lanes 2-3 12 symbols late (> max_skew 8): the first SKP gives x2 from SKP; lanes 2-3's own first SKP
+# opens no round and is dropped (only link lanes open rounds, §12.4). 600 idle rows later the lanes have caught up
+# and a SKP on all four lanes at one index widens the link to x4; packets then decode at x4.
+@multilane("pipe_x4_l0_widen_late_skp_w32_10ps", "provisional x2 from SKP; late outside SKPs open no round; a later 4-lane SKP widens to x4",
+           "pipe", 4, 4, Clocking((10, "ps"), period=1600), params={"scrambling": "off"}, skew=[0, 0, 12, 12])
+def _(lk: M.Link) -> None:
+    lk.idle_rows(2)
+    lk.skp()
+    lk.idle_rows(600)                    # idle only while the link is the provisional x2
+    lk.lane_drop(2, 12)
+    lk.lane_drop(3, 12)
+    lk.skp()
+    lk.idle_rows(1)
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=431))
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.skp()
+    lk.idle_rows(3)                      # end on an edge boundary
+
+
+# L0 start with lane 0 (the reference lane) the latest by 6 (max_skew 8): 5 filler symbols, then X for one edge right
+# before its first SKP. Its filler and that gap come before the round opened by lanes 1-3 (§12.7); offsets 6,0,0,0.
+@multilane("pipe_x4_l0_ref_late_w8_1ps", "L0 start, reference lane 6 late: its gap before its SKP reaches the pipeline before the round",
+           "pipe", 1, 4, Clocking((1, "ps"), period=4000, change="delay", delay=700), skew=[5, 0, 0, 0])
+def _(lk: M.Link) -> None:
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("ack", seq=3))
+    lk.idle_rows(1)
+    lk.lane_pause(0, "unknown", 1)
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.log.tlp(Tlp("MRd32", 4, rng_seed=421))
+    lk.idle_rows(8)
+
+
+# lane_mismatch: N_FTS on lane 2, training control on lane 1, a TS1 among TS2s on lane 1, rate id on lane 3; each once.
+@multilane("pipe_x4_lane_mismatch_w16_1ps", "lane_mismatch for N_FTS, training control, type and rate id, each reported once",
+           "pipe", 2, 4, Clocking((1, "ps"), period=8000), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=3, per={2: dict(n_fts=40)})
+    lk.ts("ts1", "link", None, count=1, per={1: dict(ctrl=0x01)})
+    lk.ts("ts1", "link", "order", count=2)
+    lk.ts("ts2", "link", "order", count=1, per={1: dict(kind="ts1")})
+    lk.ts("ts2", "link", "order", count=3, per={3: dict(rate=0x06)})
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# Common breaks: every lane's RxValid low together truncates a TLP; X on every lane drops a DLLP; both re-lock at a SKP.
+@multilane("pipe_x4_common_break_w16_1ns", "common break (all lanes gated, then all X): truncated by rxvalid, X/Z (lane 0), re-lock",
+           "pipe", 2, 4, Clocking((1, "ns"), period=8, change="delay", delay=2), direction="rx",
+           side={"rxvalid": ALL4}, params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    t = Tlp("MWr32", 0, length_dw=4, rng_seed=361).bytes()
+    lk.log.truncated("tlp", (bytes([0x00, 0x00]) + t)[:15], by="rxvalid")    # STP + 15 = 4 rows = 2 edges
+    lk.brk("rxvalid", 3)
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(1)
+    lk.log.dropped("dllp", bytes([0x00, 0x00, 0x00]))                          # SDP + 3 = 1 row
+    lk.brk("unknown", 2)
+    lk.idle_rows(2)
+    lk.skp()
+    lk.log.dllp(Dllp("ack", seq=1))
+    lk.idle_rows(2)
+
+
+def make_ml(fx: MlFixture) -> dict[str, str]:
+    lk = M.Link(fx.bound, fx.n, fx.scrambled, fx.skew)
+    fx.build(lk)
+    lay = lk.finish()
+    names = M.vcd_names(fx.bound, fx.direction, fx.side)
+    for p in range(fx.bound):
+        for e in lay.edges[p]:
+            if e.kind == "gap" and e.gap != "unknown":
+                assert p in fx.side.get(e.gap, []), f"lane {p} gated by unbound {e.gap}{p}"
+            if e.rxstatus:
+                assert p in fx.side.get("rxstatus", []), f"rxstatus{p} not bound"
+    tr = M.write_vcd(lay, fx.clk, names)
+    M.check_host(lay, tr, fx.clk, names, fx.name)
+    _, tfs, pfs = M.edge_times(fx.clk, lay.count)
+    txs = M.expected(lk, lay, tfs, pfs, fx.decoder, fx.params, fx.side.get("rxstatus", []), fx.hand)
+    paths = {s: tr.paths[s] for s, _ in names}
+    fpt = L.fs_per_tick(*fx.clk.timescale)
+    return {f"{fx.name}.vcd": tr.text,
+            f"{fx.name}.bindings.json": L.bindings_json(fx.decoder, paths, fx.params),
+            f"{fx.name}.expected.json": L.canonical(txs, fpt)}
+
+
 # ── generation ───────────────────────────────────────────────────────────────
 
 def make_serial(fx: SerialFixture) -> dict[str, str]:
@@ -1568,6 +2255,8 @@ def make(fx: Fixture) -> dict[str, str]:
         return make_serial(fx)
     if isinstance(fx, LinkFixture):
         return make_link(fx)
+    if isinstance(fx, MlFixture):
+        return make_ml(fx)
     st = Stream(fx.lanes, scrambled=fx.scrambled)
     fx.build(st)
     st.finish()

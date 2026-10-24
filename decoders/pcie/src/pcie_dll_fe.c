@@ -390,6 +390,8 @@ void pcie_dll_fe_event(void *ctx, const pcie_event *ev) {
         case PCIE_EV_K_IN_PACKET:
         case PCIE_EV_UNEXPECTED_K:
         case PCIE_EV_UNKNOWN_OS:
+        case PCIE_EV_FRAMING_LANE:
+        case PCIE_EV_PAD_MISPLACED:
             pcie_fe_emit_error(fe->sink, ev);
             return;
         case PCIE_EV_TS:

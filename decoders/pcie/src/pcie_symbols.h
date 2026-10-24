@@ -38,6 +38,13 @@ typedef struct pcie_sym {
     bool k;            // datak bit for this lane: 1 = control symbol
     uint64_t start_fs; // SPEC.md §4.2: t_k + floor(j * P_k / N)
     uint64_t end_fs;   // start_fs + floor(P_k / N)
+    // A row of a multi-lane link (SPEC.md §12.7, §12.10). All zero on an x1
+    // link and in the symbols of an ordered set.
+    bool has_plain; // `plain` is this D symbol descrambled by its own lane
+    uint8_t plain;
+    uint8_t width; // link width w of the row (0: not a row)
+    uint8_t pos;   // logical lane: the position in the row, 0..w-1
+    uint8_t lane;  // physical lane, for labels
 } pcie_sym;
 
 // True when `byte` with K = 1 is one of the ten control symbols above

@@ -1,0 +1,21 @@
+{
+  "decoder": "ferrite.pcie_pipe_w16",
+  "signal_bindings": {
+    "pclk": "tb.dut.pclk",
+    "data": "tb.dut.RxData",
+    "datak": "tb.dut.RxDataK",
+    "rxvalid": "tb.dut.RxValid",
+    "data1": "tb.dut.RxData1",
+    "datak1": "tb.dut.RxDataK1",
+    "rxvalid1": "tb.dut.RxValid1",
+    "data2": "tb.dut.RxData2",
+    "datak2": "tb.dut.RxDataK2",
+    "rxvalid2": "tb.dut.RxValid2",
+    "data3": "tb.dut.RxData3",
+    "datak3": "tb.dut.RxDataK3",
+    "rxvalid3": "tb.dut.RxValid3"
+  },
+  "parameters": {
+    "scrambling": "off"
+  }
+}

@@ -43,7 +43,7 @@ bool wcx_layout_build_bound(wcx_layout *l, const wcx_signal_spec *specs, size_t 
         l->sig[i].bound = true;
         l->sig[i].offset = offset;
         l->sig[i].width = s->bit_width;
-        // At most 64 signals of at most 4096 bits: no overflow.
+        // At most 128 signals of at most 4096 bits: no overflow.
         offset += s->bit_width;
     }
     l->count = n;

@@ -1,4 +1,4 @@
-# PCIe decoders: output specification (v0.2)
+# PCIe decoders: output specification (v0.3)
 
 This is the contract between the C decoders in `src/` and the independent
 fixture generator in `tools/`. Both are written from this document and the
@@ -31,7 +31,8 @@ of that width, so each decoder is registered once per PIPE data width:
 | `ferrite.pcie_dll_w64` | PCIe Data Link Layer (64-bit) | 64 | 8 |
 
 N = symbols per clock = width / 8. Byte lane j (bits `8j+7:8j` of `data`,
-bit j of `datak`) is the j-th symbol on the wire. x1 links only.
+bit j of `datak`) is the j-th symbol on the wire. Links of 1 to 16 lanes
+(§12).
 
 Two more decoders read the serial line itself instead of the PIPE
 interface; §11 specifies them, and §2-§4 do not apply to them:
@@ -60,6 +61,8 @@ interface; §11 specifies them, and §2-§4 do not apply to them:
 | `sample_point` | enum | `before_edge`, `at_edge` | `before_edge` | both |
 | `coalesce` | bool | | `true` | PIPE |
 | `show_idle` | bool | | `false` | PIPE |
+| `max_skew` | int | 0 to 64 | 8 | both (§12) |
+| `lane_order` | enum | `auto`, `physical` | `auto` | both (§12) |
 
 `enum_labels`: scrambling `{"auto": "Detect", "on": "On (descramble)", "off":
 "Off"}`; sample_point `{"before_edge": "Before the clock edge", "at_edge": "At
@@ -663,3 +666,304 @@ they had to take where §11 was silent; they are now part of it.
 12. **The `gen1`/`gen2` in a TS1/TS2 label** is the rate the TS advertises
     (§7), not the rate of the line, so a Gen1 burst can show `Symbol lock
     (Gen1, 2.5 GT/s)` beside `TS1 ... gen2`.
+
+## 12. Multi-lane links (x2 to x16)
+
+The PIPE and Data Link Layer decoders take a link of up to 16 lanes, Gen1
+and Gen2. The serial line decoders (§11) stay x1. With one lane bound,
+nothing in this section applies: x1 bindings, fixtures and output do not
+change.
+
+### 12.1 Signals and parameters
+
+Lane 0 is the existing `data`, `datak`, `rxvalid`, `txelecidle` and
+`rxstatus`. Lanes 1 to 15 add optional signals of the same widths. In
+manifest order they follow `rxstatus`, lane by lane: `data<l>`, `datak<l>`,
+`rxvalid<l>`, `txelecidle<l>`, `rxstatus<l>`.
+
+| Name | Width | Meaning |
+|---|---|---|
+| `data1` .. `data15` | 8N | Lane l's TxData or RxData |
+| `datak1` .. `datak15` | N | Lane l's TxDataK or RxDataK; bound exactly when `data<l>` is |
+| `rxvalid1` .., `txelecidle1` .., `rxstatus1` .. | 1, 1, 3 | As lane 0's, for lane l |
+
+`pclk` is shared. A lane is **bound** when its `data` signal is. The bound
+lanes must be 0 to B-1, with B one of 1, 2, 4, 8, 12, 16 (B = 1 is x1).
+Anything else is a configuration error and nothing is decoded:
+
+| Problem | Message |
+|---|---|
+| A gap | `lanes bound: 0, 1, 3 (lane 2 is missing)` |
+| Not a link width | `lanes bound: 0, 1, 2 (x3 is not a PCIe link width)` |
+| `data<l>` without `datak<l>`, or the reverse | `datak2 must be bound together with data2` |
+| Another lane-l signal without `data<l>` | `rxvalid5 is bound but data5 is not` |
+
+Two new parameters, for both decoders:
+
+| Name | Kind | Values | Default |
+|---|---|---|---|
+| `max_skew` | int | 0 to 64 (symbols) | 8 |
+| `lane_order` | enum | `auto`, `physical` | `auto` |
+
+`enum_labels`: lane_order `{"auto": "From TS1/TS2 lane numbers",
+"physical": "Physical"}`. The default `max_skew` covers the receiver limits
+(20 ns at Gen1, 5 symbols; 8 ns at Gen2, 4 symbols) with room for simulation
+models.
+
+### 12.2 Symbol index
+
+Every rising edge of `pclk` counts, gated or X/Z (§10.4). The symbol in byte
+position j at rising edge k (k from 0) has **index** `k·N + j` on every lane,
+and the time of §4.2. Lanes share `pclk`, so equal indexes mean equal times.
+
+### 12.3 Lane items
+
+Each bound lane is read on its own and cut, in index order, into items:
+
+- **Gap**: a maximal run of edges at which the lane is gated (its own
+  `rxvalid`/`txelecidle`, §4.3) or unknown (X or Z in its own `data` or
+  `datak`, §4.4), all of one kind: `rxvalid`, `txelecidle` or `unknown`. A
+  change of kind starts a new gap.
+- **Ordered set**: COM and the symbols §5.3 adds to it, recognised on the
+  raw symbols (ordered sets are sent unscrambled). Its index is its COM's. A
+  SKP OS ends at its fifth SKP or before the first non-SKP. A symbol that
+  fits no ordered set ends one of type `unknown` and is part of it, as in
+  §5.3. An ordered set cut short by a gap or by the end of the trace is a
+  SKP OS if it holds at least one SKP, else `unknown`.
+- **Row symbol**: any other symbol.
+
+Each lane also keeps its own descrambler (§5.2): reset by its COM, advanced
+by each of its symbols except SKP. A row symbol's plain value uses its own
+lane's key.
+
+### 12.4 Rounds
+
+Let W = `max_skew`. The **considered lanes** are the link's lanes once the
+link is decided by a TS2 run (§12.5 rule 1), else every bound lane. Lanes
+that are not considered are ignored: their items produce nothing. A
+considered lane outside the link (while the link is decided only by SKP)
+takes part in rounds but not in rows, alignment or lane mismatch.
+
+Rounds pair up the lanes' copies of one ordered set. In index order, the
+lowest-index ordered set not yet in a round (lowest lane on a tie) opens a
+round at its index c: of the considered lanes while the link is undecided,
+of the link's lanes once it is decided. The round takes, from each lane
+that opens rounds, its first ordered set not yet in a round, if its index
+is at most c + W. A considered lane outside the link joins with its first
+ordered set not yet in a round if that one's index is within W of c,
+before or after; one more than W before c is dropped, as no round can take
+it. A lane without an ordered set in the round is **absent**.
+
+The round's **reference lane** is its lowest present link lane in logical
+order; while the link is undecided, its lowest present lane. The link is
+taken as it was before this round, also when this round decides it again.
+The reference lane's ordered set is **the round's ordered set**.
+
+Outside rounds, the **reference lane** is logical lane 0 of the link, or
+lane 0 while the link is undecided.
+
+### 12.5 The link
+
+The link is a set of lanes in a logical order. It starts undecided. It is
+decided, or decided again, at two kinds of round:
+
+1. **End of a TS2 run**: a round whose ordered set is a TS2, where the
+   round's reference lane's next item is not an ordered set (it is a row
+   symbol or a gap, or the trace ends). The link becomes the present lanes
+   whose ordered set here is a TS2 with Link# and Lane# both not PAD. If
+   there are none, nothing changes.
+2. **SKP**: while the link has never been decided by rule 1, a round whose
+   ordered set is a SKP OS, when the present lanes whose ordered set is a
+   SKP OS make a wider link than the current one (after the width rule
+   below; an undecided link has width 0). The link becomes those lanes. So
+   a trace that starts inside one lane's first SKP still reaches its full
+   width at the next SKP.
+
+Once decided by rule 1, only the link's lanes are considered, so the link
+can shrink at a later TS2 run but not grow.
+
+**Logical order.** With `lane_order=auto`, after rule 1, if the link's
+Lane#s in that round are exactly 0 to w-1, lane p is logical lane Lane#(p).
+In every other case, logical order is physical order.
+
+**Width.** If the link has w lanes and w is not 1, 2, 4, 8, 12 or 16, it
+keeps its first w' lanes in logical order, w' being the largest of those
+widths below w. Each lane left out is a `lane_skew` error, spanning its
+ordered set in the round.
+
+When the link's lanes (in logical order) differ from before, a `link_width`
+transaction is emitted. A `lane_order` transaction is emitted when the
+link's order is not physical and differs from the previous link's, and when
+it is physical again after one that was not. Physical means the lanes in
+ascending order; the first link counts as following a physical one.
+
+### 12.6 Alignment
+
+With the link decided, a round is **complete** when every link lane is
+present.
+
+- **Lock**: a complete round while not aligned makes the link aligned and
+  emits `lanes_aligned`. Offsets: each link lane's ordered-set index minus
+  the lowest of them, in logical order. The round that decides the link is
+  complete, so it locks.
+- A complete round while aligned emits a new `lanes_aligned` only if the
+  width or the offsets differ from the last one. Offsets are measured at
+  COM, so lanes that differ only in SKP count do not change them.
+- **Loss**: while aligned, a round that is not complete, or a row that
+  cannot be paired (below). The link is no longer aligned, and `lane_skew`
+  names the first absent or failing link lane in logical order. A loss is
+  also a pipeline break of kind `unknown` (§4.4): an open packet or
+  ordered set is dropped without an error of its own, since the
+  `lane_skew` reports it. At a round, the break comes before the round's
+  ordered set.
+- While not aligned, a round that is not complete emits `lane_skew` only if
+  none was emitted since the link was last decided or locked.
+
+**Rows.** While aligned, between a round and the next one, the k-th items
+of the link lanes after their ordered sets form row k:
+
+- All row symbols: the row goes to the pipeline (§12.7).
+- All gaps of one kind: a **common break**. The pipeline breaks with that
+  kind (§4.3, §4.4), and the link is no longer aligned, without an error.
+- Otherwise (different kinds, or a lane with no k-th item before its next
+  ordered set): loss at row k. Each link lane's k-th item has a kind: a row
+  symbol, a gap of one kind, or none (the lane is at its next ordered set).
+  The kind most link lanes have is the norm; on a tie, the tied kind that
+  comes first in logical order (logical lane 0's, when it is one of them).
+  `lane_skew` names the first link lane in logical order whose kind is not
+  the norm. The k-th items are then withheld like the row symbols after them
+  (§12.11), so the reference lane's counts in the unaligned run.
+
+While not aligned, row symbols are **withheld**: not decoded (§12.11).
+
+Skew beyond `max_skew` is not detected as such. Where ordered sets follow
+each other closely (TS1/TS2 every 16 symbols), a lane late by more than
+`max_skew` can pair with the next ordered set of the other lanes, lock with
+wrong offsets and lose alignment at the first row.
+
+### 12.7 What the pipeline sees
+
+The lane layer feeds one symbol stream to §5 (to both pipelines in `auto`):
+
+- **A round**: the symbols of its ordered set, with the reference lane's
+  times. TS1/TS2 and SKP ordered sets carry per-lane fields (§12.9).
+- **A row**: its w symbols in logical order. Each carries the row's time:
+  the earliest start and the latest end of its w symbols. In `on` mode, each
+  D symbol takes its plain value from its own lane's descrambler (§12.3).
+- **A gap of the reference lane while not aligned**, and a common break: a
+  pipeline break of the gap's kind.
+
+Withheld symbols are not fed and do not end a coalesced run. While not
+aligned, rounds and the reference lane's gaps reach the pipeline in index
+order (a round at its index c; a gap at its first edge's), except that the
+reference lane's items before its own ordered set in a round (its row
+symbols and gaps) come before that round.
+
+### 12.8 Edge-level transactions
+
+- **RxStatus** (§4.6, PIPE decoder): per bound lane, each with its own
+  previous value and its own gating. With B > 1, the label gains ` (lane
+  2)` and the fields gain `lane` after `code`.
+- **X/Z** (§4.4): one `X/Z on data` per unknown gap of the reference lane;
+  with B > 1 the fields gain `lane` after `edges`. Unknown gaps on other
+  lanes produce no X/Z transaction.
+
+### 12.9 Ordered sets on a multi-lane link
+
+**TS1/TS2.** `link` and `lane` become `links` and `lanes`: one entry per
+bound lane in physical order, joined by commas. An entry is that lane's
+Link# or Lane# (decimal or PAD) when its ordered set in the round is a TS1
+or TS2, else `-`. The label shows `link=X` when every entry other than `-`
+is X, else `links=…`, and always `lanes=…`:
+
+    TS1 ×4 link=0 lanes=0,1,2,3 n_fts=24 gen1
+    TS2 links=0,0,PAD,PAD lanes=0,1,PAD,PAD n_fts=24 gen1
+
+The other fields are the round's ordered set's. Coalescing (§7) compares
+the round's symbols 1-15 and the `links` and `lanes` lists, nothing else.
+
+**SKP.** `skp_symbols` becomes a string: each bound lane's SKP count in
+physical order, `-` where its ordered set in the round is not a SKP OS. The
+label is `SKP` when every count shown is 3, else `SKP ×3,3,2,3`.
+
+**Lane mismatch.** In each round, every present considered lane's ordered
+set (considered with the link as it was before this round, as for the
+reference lane) is compared with the round's: first the type (TS1, TS2, SKP, FTS, EIOS,
+EIEOS, unknown), then, for TS1/TS2, N_FTS, the Data Rate Identifier and
+Training Control. The first difference is a `lane_mismatch` error spanning
+that lane's ordered set. `expected` and `got` are the type names, or
+`n_fts=24`, `rate_id=0x02`, `training_control=0x00`. A lane whose
+difference is the same as in its previous round is not reported again.
+Link# and Lane# are never compared.
+
+### 12.10 Framing on a row (w ≥ 2)
+
+Positions in a row are logical lanes 0 to w-1.
+
+- **Start lane**: an STP or SDP at position p is a `framing_lane` error,
+  unless p = 0 (w = 2 or 4) or p is a multiple of 4 (w ≥ 8). The packet is
+  still framed from it.
+- **PAD fill**: the PADs right after an END or EDB that closed a packet in
+  the same row, up to the next other symbol or the end of the row, are fill
+  and are not decoded.
+- Any other PAD outside a packet and outside an ordered set is a
+  `pad_misplaced` error, instead of `unexpected_k` (§10.2). Inside a packet
+  it stays `k_in_packet`.
+
+With w = 1 (a link of one lane), none of this applies.
+
+### 12.11 Unaligned data
+
+Withheld row symbols are reported, without decoding, as runs. A run counts
+the withheld row symbols of the reference lane and spans the first to the
+last of them. It ends at a lock, at a `lane_skew`, or at the end of the
+trace, and is emitted then if it counts at least one symbol:
+
+- `Packet data before lane alignment`, `is_error` false, when no
+  `lane_skew` came between the last lock (or the start of the trace) and the
+  run's first symbol.
+- `Packet data after lane alignment lost`, `is_error` true, otherwise.
+
+### 12.12 New transactions
+
+| Situation | Label | `type` | `is_error` | Fields after `type` | Decoders |
+|---|---|---|---|---|---|
+| Link decided or changed | `Link width x2 (4 bound)`; from rule 2: `Link width x4 (4 bound, from SKP)` | `link_width` | false | `width`, `bound`, `lanes` (physical, in logical order: `"0,1"`), `from` (`"ts2"`/`"skp"`) | PIPE |
+| Logical order changed | `Lane order 3,2,1,0` | `lane_order` | false | `order` (the physical lane of logical lane 0, 1, …) | PIPE |
+| Lock, or new offsets | `Lanes aligned x4 (offsets 0,1,0,2)` | `lanes_aligned` | false | `width`, `offsets` | PIPE |
+| Loss, or a lane cut from the width | `Lanes not aligned (lane 2)` | `lane_skew` | true | `lane`, `error` | both |
+| Ordered sets differ | `Lane 1 differs: TS2, lane 0 TS1` | `lane_mismatch` | true | `lane`, `expected`, `got`, `error` | PIPE |
+| Start on the wrong lane | `STP on lane 2` | `framing_lane` | true | `symbol`, `lane`, `error` | both |
+| PAD outside a packet | `PAD outside a packet (lane 5)` | `pad_misplaced` | true | `lane`, `error` | both |
+| Withheld data | §12.11 | `unaligned` | §12.11 | `symbols`, then `error` when an error | both |
+
+Spans: `link_width`, `lane_order` and `lanes_aligned` span the round's
+present ordered sets (earliest start to latest end). A `lane_skew` at a
+round spans the same; at a row, the named lane's k-th item, or, when it
+has none, the first k-th item of a lane with the norm kind. `lane_mismatch` spans the
+lane's ordered set; `framing_lane` and `pad_misplaced` their symbol.
+
+Lane numbers in labels and fields are physical, so they match the bound
+signals. Lists are comma-separated with no spaces.
+
+`error` texts (§10.1 style):
+
+| `type` | `error` |
+|---|---|
+| `lane_skew` | `The lane did not line up with the other lanes of the link.` |
+| `lane_mismatch` | `The lanes of one link sent different ordered sets.` |
+| `framing_lane` | `A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 (x8 and wider).` |
+| `pad_misplaced` | `PAD outside a packet is valid only as fill after END or EDB.` |
+| `unaligned` | `Packet data after lane alignment was lost is not decoded.` |
+
+In `auto` scrambling, lane-level transactions before the lock are buffered
+in both pipelines, as edge-level ones are (§10.8 item 4).
+
+### 12.13 End of trace
+
+At flush, each lane's ordered set in progress is closed (§12.3). Rounds and
+rows are then processed as far as the items go: the last round takes what
+exists, and a row that some lane cannot complete is dropped without an
+error. A gap of the reference lane in such a row still breaks the pipeline
+and gives its `X/Z on data` (§12.8). The unaligned run is emitted, then
+§10.6 applies to the pipeline.

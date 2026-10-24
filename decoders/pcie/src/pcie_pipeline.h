@@ -46,9 +46,26 @@
 // TS1/TS2 body: symbols 1-15 after COM (protocol-notes.md §2).
 #define PCIE_TS_BODY 15u
 
+// Lanes a link may bind (SPEC.md §12.1).
+#define PCIE_MAX_LANES 16u
+
+// The per-lane view of one round's ordered set (SPEC.md §12.9), given to the
+// pipeline before the round's COM and kept with the TS1/TS2 or SKP OS that
+// COM starts. `bound` is 0 on an x1 link: no per-lane fields.
+typedef struct pcie_os_lanes {
+    uint8_t bound;     // bound lanes, physical 0..bound-1
+    uint16_t ts;       // bit l: lane l's ordered set in the round is a TS1 or TS2
+    uint16_t link_pad; // bit l: its Link# is PAD
+    uint16_t lane_pad; // bit l: its Lane# is PAD
+    uint16_t skp;      // bit l: lane l's ordered set is a SKP OS
+    uint8_t link[PCIE_MAX_LANES];
+    uint8_t lane[PCIE_MAX_LANES];
+    uint8_t skp_count[PCIE_MAX_LANES];
+} pcie_os_lanes;
+
 typedef enum pcie_event_kind {
     PCIE_EV_TS,            // u.ts
-    PCIE_EV_SKP,           // u.count = SKP symbols (1..5)
+    PCIE_EV_SKP,           // u.count = SKP symbols (1..5); per-lane counts in `lanes`
     PCIE_EV_FTS,           // u.count = 1
     PCIE_EV_EIOS,          // no payload
     PCIE_EV_EIEOS,         // u.count = 1
@@ -61,6 +78,8 @@ typedef enum pcie_event_kind {
     PCIE_EV_K_IN_PACKET,   // u.symbol: the K byte; the packet was dropped (§10.2)
     PCIE_EV_UNEXPECTED_K,  // u.symbol: PAD/SKP/FTS/IDL/EIE outside a packet and OS (§10.2)
     PCIE_EV_UNKNOWN_OS,    // u.symbol: the symbol that did not fit
+    PCIE_EV_FRAMING_LANE,  // u.lane_sym: STP or SDP at a position a packet cannot start (§12.10)
+    PCIE_EV_PAD_MISPLACED, // u.lane_sym: PAD outside a packet that is not row fill (§12.10)
     PCIE_EV_BREAK          // gating, X/Z or end of stream: nothing is pending any more
 } pcie_event_kind;
 
@@ -86,6 +105,7 @@ typedef struct pcie_ts {
     bool ts2;                   // symbol 6 was 0x45 (else 0x4A)
     uint8_t syms[PCIE_TS_BODY]; // symbols 1..15 (syms[0] = Link#, ... syms[5] = identifier)
     uint16_t kmask;             // bit i set: syms[i] was a K symbol (PAD)
+    pcie_os_lanes lanes;        // the other lanes' Link# and Lane# (§12.9)
 } pcie_ts;
 
 typedef struct pcie_packet {
@@ -117,7 +137,12 @@ typedef struct pcie_event {
             uint64_t symbols; // body length when truncated
             pcie_trunc_by by;
         } truncated;
+        struct {
+            uint8_t symbol;
+            uint8_t lane; // physical
+        } lane_sym;
     } u;
+    pcie_os_lanes lanes; // PCIE_EV_SKP: per-lane SKP counts (§12.9)
 } pcie_event;
 
 typedef void (*pcie_event_fn)(void *ctx, const pcie_event *ev);
@@ -155,6 +180,10 @@ typedef struct pcie_pipeline {
     uint8_t run_first;
     uint64_t run_start_fs;
     uint64_t run_end_fs;
+    // Multi-lane links (§12.9, §12.10).
+    const pcie_os_lanes *next_os_lanes; // for the next COM; NULL: none
+    pcie_os_lanes os_lanes;             // of the ordered set being assembled
+    bool row_fill;                      // PADs that follow now are row fill
     // What the last pcie_pipeline_symbol() call did, for the scrambling
     // detector's lock rule (§5.5).
     bool step_valid_packet;       // closed a packet with a correct CRC
@@ -168,6 +197,10 @@ void pcie_pipeline_init(pcie_pipeline *p, bool descramble_on, pcie_event_fn fn, 
 
 // Feeds one symbol in wire order.
 void pcie_pipeline_symbol(pcie_pipeline *p, const pcie_sym *s);
+
+// The per-lane view of the ordered set whose COM is fed next (§12.9). The
+// pipeline copies it at that COM; `lanes` must stay valid until then.
+void pcie_pipeline_set_os_lanes(pcie_pipeline *p, const pcie_os_lanes *lanes);
 
 // The symbol stream was interrupted (SPEC.md §4.3, §4.4) or has ended. For
 // gating and X/Z: pending runs are reported, a complete SKP ordered set

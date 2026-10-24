@@ -207,12 +207,26 @@ the LCRC, and including STP/SDP in either CRC.
 
 ## 8. Lanes
 
-v1 is x1 only. A multi-lane link stripes symbols round-robin across lanes,
-and each lane carries its own ordered sets. It needs N separate lane buses
-plus lane-deskew, so it is not trivial and is **out of scope**. On a wider
-link, the PIPE decoder bound to lane 0 still decodes ordered sets correctly.
-Packets will appear broken, so label them "multi-lane? framing unreliable"
-once TS1/TS2 show Lane# != 0 or when the link width is greater than 1.
+A link of w lanes (x1, x2, x4, x8, x12, x16 or x32) stripes packet symbols
+round-robin: symbol i of the byte stream goes to logical lane i mod w
+(PCIe Base 2.1 §4.2.4.4). Each lane carries its own copy of every ordered
+set, sent on all lanes at the same time, and its own scrambler, reset by its
+own COM. Facts the decoders rely on (SPEC.md §12):
+
+- **Start lane.** x1, x2, x4: STP and SDP on logical lane 0. x8 and wider:
+  on a lane 4k. Every packet is a multiple of 4 symbols, so on x2/x4 END or
+  EDB falls on lane w-1.
+- **PAD fill** (x8+): when a packet ends before lane w-1 and nothing starts
+  after it in that symbol time, the rest of the row is PAD.
+- **Logical idle** and ordered sets are sent on all lanes; an ordered set
+  always starts a new row.
+- **Skew.** A receiver deskews up to 20 ns at 2.5 GT/s (5 symbols) and 8 ns
+  at 5.0 GT/s (4 symbols), using the ordered sets.
+- **SKP.** Elastic buffers add or remove SKP symbols per lane, so SKP
+  ordered sets may differ in length between lanes.
+- **Training.** Link# and Lane# are assigned in Configuration; lanes outside
+  the link carry PAD or go to electrical idle. A link can train narrower
+  than its port, and Lane# can be reversed.
 
 ## 9. 8b/10b on the serial line (for the serial decoders)
 

@@ -1,0 +1,7 @@
+[
+{"startTime":528,"endTime":536,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":528,"endTime":536,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":544,"endTime":560,"label":"Lanes not aligned (lane 1)","isError":true,"fields":{"type":"lane_skew","lane":"1","error":"The lane did not line up with the other lanes of the link."}},
+{"startTime":544,"endTime":580,"label":"Packet data after lane alignment lost","isError":true,"fields":{"type":"unaligned","symbols":"9","error":"Packet data after lane alignment was lost is not decoded."}},
+{"startTime":596,"endTime":604,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}}
+]

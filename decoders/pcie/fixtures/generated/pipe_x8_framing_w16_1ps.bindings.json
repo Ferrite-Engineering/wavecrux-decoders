@@ -1,0 +1,25 @@
+{
+  "decoder": "ferrite.pcie_pipe_w16",
+  "signal_bindings": {
+    "pclk": "tb.dut.pclk",
+    "data": "tb.dut.TxData",
+    "datak": "tb.dut.TxDataK",
+    "data1": "tb.dut.TxData1",
+    "datak1": "tb.dut.TxDataK1",
+    "data2": "tb.dut.TxData2",
+    "datak2": "tb.dut.TxDataK2",
+    "data3": "tb.dut.TxData3",
+    "datak3": "tb.dut.TxDataK3",
+    "data4": "tb.dut.TxData4",
+    "datak4": "tb.dut.TxDataK4",
+    "data5": "tb.dut.TxData5",
+    "datak5": "tb.dut.TxDataK5",
+    "data6": "tb.dut.TxData6",
+    "datak6": "tb.dut.TxDataK6",
+    "data7": "tb.dut.TxData7",
+    "datak7": "tb.dut.TxDataK7"
+  },
+  "parameters": {
+    "scrambling": "off"
+  }
+}
