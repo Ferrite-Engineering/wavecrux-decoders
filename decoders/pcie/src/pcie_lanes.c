@@ -45,6 +45,11 @@ static pcie_lane_item *head(pcie_lane *l) {
     return l->count > 0 ? item_at(l, 0) : NULL;
 }
 
+// The first item of a lane the caller knows is not empty.
+static pcie_lane_item *front(pcie_lane *l) {
+    return item_at(l, 0);
+}
+
 // Lane l of the link; l is always below bound, the modulo only proves it.
 static pcie_lane *lane_of(pcie_lanes *ln, unsigned l) {
     return &ln->lane[l % PCIE_MAX_LANES];
@@ -456,7 +461,7 @@ static unsigned link_order(pcie_lanes *ln, uint16_t set, bool from_skp,
     uint8_t by_lane[PCIE_MAX_LANES] = {0};
     uint16_t seen = 0;
     for (unsigned i = 0; i < w; i++) {
-        const unsigned number = head(lane_of(ln, order[i]))->os.ts[TS_LANE];
+        const unsigned number = front(lane_of(ln, order[i]))->os.ts[TS_LANE];
         if (number >= w || (seen & (1u << number)) != 0) {
             return w;
         }
@@ -516,7 +521,7 @@ static void apply_link(pcie_lanes *ln, uint16_t set, bool from_skp, const round_
     if (!is_link_width(w)) {
         const unsigned keep = width_below(w);
         for (unsigned i = keep; i < w; i++) {
-            const pcie_lane_item *it = head(lane_of(ln, order[i]));
+            const pcie_lane_item *it = front(lane_of(ln, order[i]));
             emit_skew(ln, order[i], it->start_fs, it->end_fs);
         }
         w = keep;
@@ -603,10 +608,10 @@ static bool os_differs(const pcie_lane_os *ref, const pcie_lane_os *o,
 
 static void check_mismatch(pcie_lanes *ln, unsigned lane, unsigned ref) {
     pcie_lane *l = lane_of(ln, lane);
-    const pcie_lane_item *it = head(l);
+    const pcie_lane_item *it = front(l);
     char expected[PCIE_MISMATCH_CAP] = {0};
     char got[PCIE_MISMATCH_CAP] = {0};
-    if (!os_differs(&head(lane_of(ln, ref))->os, &it->os, expected, got)) {
+    if (!os_differs(&front(lane_of(ln, ref))->os, &it->os, expected, got)) {
         l->mm_have = false;
         return;
     }
@@ -660,8 +665,8 @@ static void align_round(pcie_lanes *ln, uint16_t members, const round_span *span
             if (absent == PCIE_MAX_LANES) {
                 absent = l;
             }
-        } else if (head(lane_of(ln, l))->index < lowest) {
-            lowest = head(lane_of(ln, l))->index;
+        } else if (front(lane_of(ln, l))->index < lowest) {
+            lowest = front(lane_of(ln, l))->index;
         }
     }
     if (absent != PCIE_MAX_LANES) {
@@ -679,7 +684,7 @@ static void align_round(pcie_lanes *ln, uint16_t members, const round_span *span
     }
     uint64_t offsets[PCIE_MAX_LANES] = {0};
     for (unsigned i = 0; i < ln->width; i++) {
-        offsets[i] = head(lane_of(ln, ln->link[i]))->index - lowest;
+        offsets[i] = front(lane_of(ln, ln->link[i]))->index - lowest;
     }
     if (!ln->aligned) {
         end_run(ln);
@@ -703,7 +708,7 @@ static void forward_os(pcie_lanes *ln, unsigned ref, uint16_t members) {
         if ((members & (1u << l)) == 0) {
             continue;
         }
-        const pcie_lane_os *o = &head(lane_of(ln, l))->os;
+        const pcie_lane_os *o = &front(lane_of(ln, l))->os;
         const uint16_t bit = (uint16_t)(1u << l);
         if (o->type == PCIE_OS_TS1 || o->type == PCIE_OS_TS2) {
             ann->ts = (uint16_t)(ann->ts | bit);
@@ -720,7 +725,7 @@ static void forward_os(pcie_lanes *ln, unsigned ref, uint16_t members) {
             ann->skp_count[l] = (uint8_t)o->skp;
         }
     }
-    const pcie_lane_os *o = &head(lane_of(ln, ref))->os;
+    const pcie_lane_os *o = &front(lane_of(ln, ref))->os;
     pcie_detector_set_os_lanes(ln->det, ann);
     for (unsigned i = 0; i < o->n; i++) {
         pcie_sym s;
@@ -764,7 +769,7 @@ static round_span round_span_of(pcie_lanes *ln, uint16_t members) {
     round_span span = {UINT64_MAX, 0};
     for (unsigned l = 0; l < ln->bound; l++) {
         if ((members & (1u << l)) != 0) {
-            const pcie_lane_item *it = head(lane_of(ln, l));
+            const pcie_lane_item *it = front(lane_of(ln, l));
             span.start_fs = it->start_fs < span.start_fs ? it->start_fs : span.start_fs;
             span.end_fs = it->end_fs > span.end_fs ? it->end_fs : span.end_fs;
         }
@@ -780,7 +785,7 @@ static uint16_t lanes_with(pcie_lanes *ln, uint16_t members, pcie_os_type type) 
         if ((members & (1u << l)) == 0) {
             continue;
         }
-        const pcie_lane_os *o = &head(lane_of(ln, l))->os;
+        const pcie_lane_os *o = &front(lane_of(ln, l))->os;
         if (o->type == type &&
             (type != PCIE_OS_TS2 || (!is_pad(o, TS_LINK) && !is_pad(o, TS_LANE)))) {
             set = (uint16_t)(set | (1u << l));
@@ -791,7 +796,7 @@ static uint16_t lanes_with(pcie_lanes *ln, uint16_t members, pcie_os_type type) 
 
 // §12.5: the two kinds of round that decide the link.
 static void round_link(pcie_lanes *ln, uint16_t members, unsigned ref, const round_span *span) {
-    const pcie_os_type type = head(lane_of(ln, ref))->os.type;
+    const pcie_os_type type = front(lane_of(ln, ref))->os.type;
     if (type == PCIE_OS_TS2 && !next_is_os(lane_of(ln, ref))) {
         const uint16_t set = lanes_with(ln, members, PCIE_OS_TS2);
         if (set != 0) {
@@ -875,8 +880,8 @@ static bool try_round(pcie_lanes *ln) {
         const bool opener = !ln->decided || in_link(ln, l);
         // A considered lane outside the link joins within W either side of
         // c; its ordered sets more than W before c are dropped.
-        while (!opener && lane->count > 0 && head(lane)->kind == PCIE_ITEM_OS &&
-               head(lane)->index < first) {
+        while (!opener && lane->count > 0 && front(lane)->kind == PCIE_ITEM_OS &&
+               front(lane)->index < first) {
             pop(lane);
         }
         const pcie_lane_item *it = head(lane);
@@ -946,13 +951,13 @@ static void feed_row(pcie_lanes *ln) {
     uint64_t start = UINT64_MAX;
     uint64_t end = 0;
     for (unsigned i = 0; i < ln->width; i++) {
-        const pcie_lane_item *it = head(lane_of(ln, ln->link[i]));
+        const pcie_lane_item *it = front(lane_of(ln, ln->link[i]));
         start = it->start_fs < start ? it->start_fs : start;
         end = it->end_fs > end ? it->end_fs : end;
     }
     for (unsigned i = 0; i < ln->width; i++) {
         pcie_lane *l = lane_of(ln, ln->link[i]);
-        const pcie_lane_item *it = head(l);
+        const pcie_lane_item *it = front(l);
         pcie_sym s;
         memset(&s, 0, sizeof s);
         s.byte = it->byte;
@@ -1043,8 +1048,8 @@ static bool step_aligned(pcie_lanes *ln) {
         bool popped = false;
         for (unsigned i = 0; i < ln->width; i++) {
             pcie_lane *l = lane_of(ln, ln->link[i]);
-            while (l->count > 0 && head(l)->kind != PCIE_ITEM_OS) {
-                if (i == 0 && head(l)->kind == PCIE_ITEM_GAP) {
+            while (l->count > 0 && front(l)->kind != PCIE_ITEM_OS) {
+                if (i == 0 && front(l)->kind == PCIE_ITEM_GAP) {
                     (void)ref_gap(ln, ln->link[0], head(l));
                 }
                 pop(l);
@@ -1060,7 +1065,7 @@ static bool step_aligned(pcie_lanes *ln) {
         lose_at_row(ln);
         return true;
     }
-    const pcie_lane_item *first = head(lane_of(ln, ln->link[0]));
+    const pcie_lane_item *first = front(lane_of(ln, ln->link[0]));
     bool same = true;
     for (unsigned i = 1; i < ln->width; i++) {
         if (pair_kind(head(lane_of(ln, ln->link[i]))) != pair_kind(first)) {
@@ -1098,7 +1103,7 @@ static bool step_unaligned(pcie_lanes *ln) {
             }
             continue;
         }
-        while (lane->count > 0 && head(lane)->kind != PCIE_ITEM_OS) {
+        while (lane->count > 0 && front(lane)->kind != PCIE_ITEM_OS) {
             pop(lane);
             progress = true;
         }
@@ -1117,8 +1122,8 @@ static bool step_unaligned(pcie_lanes *ln) {
             break;
         }
     }
-    while (lane->count > 0 && head(lane)->kind != PCIE_ITEM_OS && head(lane)->index < until) {
-        pcie_lane_item *it = head(lane);
+    while (lane->count > 0 && front(lane)->kind != PCIE_ITEM_OS && front(lane)->index < until) {
+        pcie_lane_item *it = front(lane);
         if (it->kind == PCIE_ITEM_GAP) {
             const bool was_broken = it->broken;
             const bool closed = ref_gap(ln, ref, it);
