@@ -139,6 +139,7 @@ typedef struct tlp_state {
     tlp_pairs pairs;
     tlp_run run;
     tlp_held held;
+    uint64_t last_edge_fs; // the last rising clk edge, where until_next ends the last one
 } tlp_state;
 
 typedef enum beat_kind { BEAT_NONE, BEAT_UNKNOWN, BEAT_OK } beat_kind;
@@ -409,6 +410,7 @@ static void tlp_sample(wcx_decoder *d, void *state, const wcx_sample *s) {
     if (wcx_edge_step(&st->clk, s->timestamp_fs, s->bits) != WCX_EDGE_RISING) {
         return;
     }
+    st->last_edge_fs = s->timestamp_fs;
     const uint8_t *bits = wcx_edge_data(&st->clk);
     if (st->peer_bound) {
         peer_edge(st, s->layout, bits, s->timestamp_fs);
@@ -427,7 +429,8 @@ static void tlp_flush(wcx_decoder *d, void *state) {
     tlp_held *h = &st->held;
     if (h->active) {
         wcx_arena *a = wcx_decoder_arena(d);
-        (void)wcx_emit(d, h->start_fs, h->end_fs, wcx_arena_strdup(a, h->label),
+        const uint64_t end = st->last_edge_fs > h->end_fs ? st->last_edge_fs : h->end_fs;
+        (void)wcx_emit(d, h->start_fs, end, wcx_arena_strdup(a, h->label),
                        wcx_arena_strdup(a, h->fields), h->is_error);
         h->active = false;
     }

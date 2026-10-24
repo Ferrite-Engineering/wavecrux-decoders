@@ -48,7 +48,7 @@ permanent: saved WaveCrux sessions refer to them.
 | Parameter | Values | |
 |---|---|---|
 | `labels` (Labels) | `compact` (default), `full` | Compact leaves out what a link with one endpoint does not need (bus/device/function 01:00.0, the tag, a Successful status), so the label fits its box; full shows them. Every field stays in the transaction's details either way. |
-| `span` (Box width) | `packet` (default), `until_next` | Packet draws each TLP as long as it is on the stream; until_next widens each box up to the next transaction, so labels stay readable when zoomed out. |
+| `span` (Box width) | `packet` (default), `until_next` | Packet draws each TLP as long as it is on the stream; until_next widens each box up to the next transaction, and the last one up to the last clock edge, so labels stay readable when zoomed out. |
 
 The output contract is in [`SPEC.md`](SPEC.md).
 
