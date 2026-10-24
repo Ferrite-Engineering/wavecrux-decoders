@@ -1,0 +1,8 @@
+[
+{"startTime":524000,"endTime":528000,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":524000,"endTime":528000,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":524000,"endTime":536000,"label":"TLP seq=0 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x08D4543E","replay":"false"}},
+{"startTime":532000,"endTime":536000,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":536000,"endTime":544000,"label":"TLP seq=1 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x3D789B0B","replay":"false"}},
+{"startTime":544000,"endTime":548000,"label":"UpdateFC-P VC0 H=8 D=64","isError":false,"fields":{"type":"updatefc_p","vc":"0","hdr_fc":"8","data_fc":"64","crc":"0x3428"}}
+]

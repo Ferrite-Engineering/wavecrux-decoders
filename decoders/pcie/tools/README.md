@@ -161,6 +161,19 @@ Readings the serial expectations take where §11 is silent:
    line-level transactions in the undetermined buffer is not modelled; the
    generator refuses it).
 
+## Multi-lane fixtures (SPEC §12)
+
+The `pipe_x*`/`dll_x*` fixtures come from `pcie_multilane_lib.py`. `Link` is
+the transmitter: a packet layer (an x1 `Stream`) striped over the logical
+lanes, a copy of every ordered set per lane (own Link#/Lane#, SKP count,
+N_FTS), one scrambler per lane, skew, dropped or corrupted symbols, lane
+gaps, common breaks and dead lanes. `Layout` puts each lane on its own bus
+(`TxData`, `TxDataK`, `TxData1`, ... bound as `data`, `datak`, `data1`, ...)
+and cuts it into §12.3 items from what was sent. `LaneModel` applies
+§12.4-§12.13; what it feeds the pipeline maps back to the transmitter's
+units, and the x1 engines apply with the §12.9 lists and §12.10 framing on
+top. The reference decoder is x1 only, so `capture_check.py` skips these.
+
 ## SPEC readings the expectations depend on
 
 SPEC.md §10 settles the questions the first comparison raised: the exact

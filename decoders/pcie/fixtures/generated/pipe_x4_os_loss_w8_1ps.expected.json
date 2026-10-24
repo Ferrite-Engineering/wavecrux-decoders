@@ -1,0 +1,15 @@
+[
+{"startTime":4000,"endTime":132000,"label":"TS1 ×2 link=PAD lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"PAD,PAD,PAD,PAD","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":132000,"endTime":196000,"label":"TS1 link=0 lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","links":"0,0,0,0","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":196000,"endTime":324000,"label":"TS1 ×2 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":324000,"endTime":516000,"label":"TS2 ×3 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":452000,"endTime":516000,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
+{"startTime":452000,"endTime":516000,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
+{"startTime":524000,"endTime":532000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":540000,"endTime":544000,"label":"Lanes not aligned (lane 2)","isError":true,"fields":{"type":"lane_skew","lane":"2","error":"The lane did not line up with the other lanes of the link."}},
+{"startTime":540000,"endTime":556000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,-,3"}},
+{"startTime":556000,"endTime":584000,"label":"Packet data after lane alignment lost","isError":true,"fields":{"type":"unaligned","symbols":"7","error":"Packet data after lane alignment was lost is not decoded."}},
+{"startTime":584000,"endTime":600000,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
+{"startTime":584000,"endTime":600000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
+{"startTime":600000,"endTime":608000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+]

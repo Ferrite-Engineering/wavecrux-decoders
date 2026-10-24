@@ -1,0 +1,12 @@
+[
+{"startTime":548,"endTime":552,"label":"InitFC1-NP VC0 H=32 D=1","isError":false,"fields":{"type":"initfc1_np","vc":"0","hdr_fc":"32","data_fc":"1","crc":"0xB1F6"}},
+{"startTime":548,"endTime":552,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":548,"endTime":552,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":552,"endTime":560,"label":"TLP seq=0 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0xDEA60820","replay":"false"}},
+{"startTime":556,"endTime":560,"label":"InitFC1-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc1_cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xD892"}},
+{"startTime":556,"endTime":564,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":560,"endTime":568,"label":"TLP seq=1 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x99D45455","replay":"false"}},
+{"startTime":568,"endTime":584,"label":"TLP seq=2 MWr64 len=8","isError":false,"fields":{"type":"tlp","seq":"2","tlp":"MWr64","length_dw":"8","tc":"0","td":"false","ep":"false","bytes":"48","lcrc":"0x4AB5A13B","replay":"false"}},
+{"startTime":580,"endTime":584,"label":"Ack seq=2","isError":false,"fields":{"type":"ack","seq":"2","crc":"0xF155"}},
+{"startTime":600,"endTime":604,"label":"UpdateFC-P VC0 H=10 D=200","isError":false,"fields":{"type":"updatefc_p","vc":"0","hdr_fc":"10","data_fc":"200","crc":"0xECF8"}}
+]
