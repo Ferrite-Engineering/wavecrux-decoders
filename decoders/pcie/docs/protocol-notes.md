@@ -209,7 +209,7 @@ the LCRC, and including STP/SDP in either CRC.
 
 A link of w lanes (x1, x2, x4, x8, x12, x16 or x32) stripes packet symbols
 round-robin: symbol i of the byte stream goes to logical lane i mod w
-(PCIe Base 2.1 §4.2.4.4). Each lane carries its own copy of every ordered
+(PCIe Base 2.1 §4.2.2). Each lane carries its own copy of every ordered
 set, sent on all lanes at the same time, and its own scrambler, reset by its
 own COM. Facts the decoders rely on (SPEC.md §12):
 

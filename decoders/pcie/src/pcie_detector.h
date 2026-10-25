@@ -85,6 +85,10 @@ bool pcie_detector_init(pcie_detector *det, wcx_decoder *d, pcie_scrambling_para
                         bool coalesce, bool show_idle);
 void pcie_detector_free(pcie_detector *det);
 
+// More than one lane bound: repeated pad_misplaced and unknown_os errors
+// form runs (SPEC.md §12.12).
+void pcie_detector_set_runs(pcie_detector *det);
+
 // At the start of every on_sample / on_flush: releases the lock batch's
 // strings once the base reports that the host has copied them
 // (wcx_decoder_batch_delivered), which may be later than the next call.

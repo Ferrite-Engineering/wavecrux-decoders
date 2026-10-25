@@ -1710,8 +1710,9 @@ def _(lk: M.Link) -> None:
 
 # 3. SKP counts per lane.
 
-# Lane 2's elastic buffer removes a SKP (RxStatus 010) then adds one (001): SKP x3,3,2,3 and x3,3,4,3, offsets move and return.
-@multilane("pipe_x4_skp_counts_w32_1ns", "per-lane SKP counts in the label; offsets at COM; RxStatus per lane with (lane 2)",
+# Lane 2's elastic buffer removes a SKP (RxStatus 010) then adds one (001): SKP x3,3,2,3 and x3,3,4,3; the COM offsets
+# move and return, but SKP add/remove is silent: no new lanes_aligned.
+@multilane("pipe_x4_skp_counts_w32_1ns", "per-lane SKP counts in the label; SKP add/remove emits no lanes_aligned; RxStatus per lane with (lane 2)",
            "pipe", 4, 4, Clocking((1, "ns"), period=16), direction="rx", side={"rxstatus": ALL4},
            params={"scrambling": "off"})
 def _(lk: M.Link) -> None:
@@ -1785,6 +1786,65 @@ def _(lk: M.Link) -> None:
            hand={0: lambda V: _rev_rows(V, REV_DLLP1, 16, 8), 1: lambda V: _rev_rows(V, REV_DLLP2, 8, 16)})
 def _(lk: M.Link) -> None:
     reversed_body(lk)
+
+
+# A SKP right after the last TS2 of a reversed link: the TS2 run still ends there (rule 1 skips SKP),
+# so the link keeps Lane order 3,2,1,0 and packets decode; not a link "from SKP" in physical order.
+@multilane("pipe_x4_ts2_then_skp_w16_10ps", "SKP right after the last TS2: rule 1 looks past it, Lane order 3,2,1,0 holds, packets decode",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk, order=[3, 2, 1, 0])
+    lk.skp()
+    lk.idle_rows(4)
+    lk.log.dllp(REV_DLLP1)
+    lk.idle_rows(2)
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.dllp(REV_DLLP2)
+    lk.idle_rows(4)
+
+
+# Lane 2 stuck on PAD in idle rows (show_idle on): one run per stretch, not one error per row; Idle does not end it,
+# the DLLP does; PAD on lane 1 is a run of its own.
+@multilane("pipe_x4_pad_stuck_w16_1ns", "PAD stuck on one lane: pad_misplaced runs with (N times) and occurrences; Idle does not end a run",
+           "pipe", 2, 4, Clocking((1, "ns"), period=8), params={"scrambling": "off", "show_idle": True})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    for _ in range(12):
+        lk.at(2)
+        lk.pad_misplaced()
+        lk.row_end()
+    lk.log.dllp(Dllp("ack", seq=0))
+    for _ in range(3):
+        lk.at(2)
+        lk.pad_misplaced()
+        lk.row_end()
+    lk.at(1)
+    lk.pad_misplaced()
+    lk.row_end()
+    lk.idle_rows(2)
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# Lane 2 stuck on COM for 10 rounds: as the only lane present it is the reference, so each COM COM is an Unknown
+# ordered set: one run, after one lane_skew; the next SKP re-locks and the DLLP decodes.
+@multilane("dll_x4_com_stuck_w8_1ns", "COM stuck on one lane: one unknown_os run with occurrences, not one error per round",
+           "dll", 1, 4, Clocking((1, "ns"), period=4), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.idle_rows(2)
+    for _ in range(10):
+        lk.os([M.Os("unknown", raw=((COM, True), (COM, True))) if p == 2 else [(0x00, False), (0x00, False)]
+               for p in range(4)])
+    lk.idle_rows(10)            # more than max_skew: the last COM COM does not pair with the SKP
+    lk.skp()
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(4)
 
 
 # 5. A lane loses an ordered set; a lane gated mid-packet.

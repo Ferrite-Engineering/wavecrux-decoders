@@ -301,6 +301,9 @@ static bool pcie_init(wcx_decoder *d, void *state) {
         wcx_decoder_fail(d, "out of memory starting the decoder"); /* defensive: allocation */
         return false;
     }
+    if (st->bound > 1u) {
+        pcie_detector_set_runs(&st->det);
+    }
     return true;
 }
 

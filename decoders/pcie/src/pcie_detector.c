@@ -199,8 +199,19 @@ void pcie_detector_emit(pcie_detector *det, uint64_t start_fs, uint64_t end_fs, 
     }
 }
 
+void pcie_detector_set_runs(pcie_detector *det) {
+    for (unsigned i = 0; i < det->branches; i++) {
+        det->br[i].sink.runs = true;
+    }
+}
+
 void pcie_detector_end_of_trace(pcie_detector *det) {
     pcie_detector_break(det, PCIE_BREAK_FLUSH);
+    for (unsigned i = 0; i < det->branches; i++) {
+        if (!det->locked || i == det->winner) {
+            pcie_sink_end_run(&det->br[i].sink);
+        }
+    }
 }
 
 void pcie_detector_finish(pcie_detector *det, uint64_t now_fs) {

@@ -336,7 +336,7 @@ static void emit_idle(pcie_pipe_fe *fe, const pcie_event *ev) {
     wcx_json_begin(&j, a);
     wcx_json_add_str(&j, "type", "idle");
     wcx_json_add_u64(&j, "symbols", ev->u.count);
-    pcie_sink_emit(fe->sink, ev->start_fs, ev->end_fs, label, wcx_json_end(&j), false);
+    pcie_sink_emit_idle(fe->sink, ev->start_fs, ev->end_fs, label, wcx_json_end(&j));
 }
 
 // "TLP frame seq=5 (24 symbols)" / "DLLP frame (6 symbols)", ", EDB" when

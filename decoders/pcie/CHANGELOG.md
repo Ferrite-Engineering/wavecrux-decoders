@@ -18,8 +18,11 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
   start-lane and PAD-fill checks. New transactions: `link_width`,
   `lane_order`, `lanes_aligned`, `lane_skew`, `lane_mismatch`,
   `framing_lane`, `pad_misplaced`, `unaligned`; TS1/TS2 carry `links` and
-  `lanes`, SKP OS per-lane counts, RxStatus its lane. With one lane bound
-  the output is unchanged. Requested in #8.
+  `lanes`, SKP OS per-lane counts, RxStatus its lane. A SKP right after the
+  last TS2 does not hide the end of the TS2 run, SKP add/remove does not
+  emit `lanes_aligned`, and a stuck lane gives `pad_misplaced` and
+  `unknown_os` runs with `occurrences`, not one error per row. With one lane
+  bound the output is unchanged. Requested in #8.
 - Each release archive now carries `tools/wcxhost` (`tools/wcxhost.exe` on
   Windows), the host emulator, signed like the library: it runs these
   decoders over a VCD without WaveCrux, for a check in CI. See

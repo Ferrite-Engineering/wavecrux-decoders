@@ -35,10 +35,27 @@ typedef struct pcie_txbuf {
     bool overflow; // a push failed: the buffer is full or a string was NULL
 } pcie_txbuf;
 
+// SPEC.md §12.12: a run of one repeated error on a multi-lane link.
+typedef enum pcie_err_kind {
+    PCIE_ERR_NONE = 0,
+    PCIE_ERR_PAD,        // pad_misplaced; key: the lane
+    PCIE_ERR_UNKNOWN_OS, // unknown_os; key: the symbol
+} pcie_err_kind;
+
+typedef struct pcie_err_run {
+    pcie_err_kind kind;
+    unsigned key;
+    uint64_t start_fs;
+    uint64_t end_fs;
+    uint64_t count;
+} pcie_err_run;
+
 typedef struct pcie_sink {
     wcx_decoder *d;
     pcie_txbuf *buf;      // NULL: emit directly through the base
     wcx_arena *buf_arena; // strings for buffered transactions
+    bool runs;            // more than one lane bound: repeated errors form runs
+    pcie_err_run run;     // the run in progress
 } pcie_sink;
 
 // Allocates room for `cap` transactions. False on allocation failure.
@@ -52,8 +69,20 @@ void pcie_txbuf_push(pcie_txbuf *b, uint64_t start_fs, uint64_t end_fs, const ch
 // The arena a front end must build this sink's strings in.
 wcx_arena *pcie_sink_arena(const pcie_sink *s);
 
-// Emits or buffers one transaction.
+// Emits or buffers one transaction. It ends the run in progress first.
 void pcie_sink_emit(pcie_sink *s, uint64_t start_fs, uint64_t end_fs, const char *label,
                     const char *fields, bool is_error);
+
+// The same, for Idle, which does not end a run (SPEC.md §12.12).
+void pcie_sink_emit_idle(pcie_sink *s, uint64_t start_fs, uint64_t end_fs, const char *label,
+                         const char *fields);
+
+// One occurrence of a run's error: it extends the run in progress when that
+// is of the same kind and key, else ends it and starts a new one.
+void pcie_sink_run(pcie_sink *s, pcie_err_kind kind, unsigned key, uint64_t start_fs,
+                   uint64_t end_fs);
+
+// Emits the run in progress, if any.
+void pcie_sink_end_run(pcie_sink *s);
 
 #endif // PCIE_SINK_H

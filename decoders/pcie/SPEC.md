@@ -768,8 +768,10 @@ The link is a set of lanes in a logical order. It starts undecided. It is
 decided, or decided again, at two kinds of round:
 
 1. **End of a TS2 run**: a round whose ordered set is a TS2, where the
-   round's reference lane's next item is not an ordered set (it is a row
-   symbol or a gap, or the trace ends). The link becomes the present lanes
+   round's reference lane's next item that is not a SKP OS is not an
+   ordered set (it is a row symbol or a gap, or the trace ends). A SKP OS
+   may follow the last TS2, so it does not continue the run; the round
+   waits until that item is known. The link becomes the present lanes
    whose ordered set here is a TS2 with Link# and Lane# both not PAD. If
    there are none, nothing changes.
 2. **SKP**: while the link has never been decided by rule 1, a round whose
@@ -807,8 +809,13 @@ present.
   the lowest of them, in logical order. The round that decides the link is
   complete, so it locks.
 - A complete round while aligned emits a new `lanes_aligned` only if the
-  width or the offsets differ from the last one. Offsets are measured at
-  COM, so lanes that differ only in SKP count do not change them.
+  width or the offsets differ from the last ones.
+- **SKP add/remove is silent.** After a complete round whose ordered sets
+  on the link lanes are all SKP OSes, the last offsets are taken again,
+  without a transaction, at the end of each lane's SKP OS (its last symbol's
+  index, minus the lowest of them). An elastic buffer that adds or removes
+  SKP symbols moves the next COM on that lane, and this keeps it from
+  emitting `lanes_aligned`.
 - **Loss**: while aligned, a round that is not complete, or a row that
   cannot be paired (below). The link is no longer aligned, and `lane_skew`
   names the first absent or failing link lane in logical order. A loss is
@@ -894,7 +901,9 @@ Training Control. The first difference is a `lane_mismatch` error spanning
 that lane's ordered set. `expected` and `got` are the type names, or
 `n_fts=24`, `rate_id=0x02`, `training_control=0x00`. A lane whose
 difference is the same as in its previous round is not reported again.
-Link# and Lane# are never compared.
+Link# and Lane# are never compared. Until a TS2 run decides the link, every
+bound lane is considered, so a bound lane outside the trained link that
+sends another type of ordered set (or none) is reported here.
 
 ### 12.10 Framing on a row (w ≥ 2)
 
@@ -936,6 +945,16 @@ trace, and is emitted then if it counts at least one symbol:
 | Start on the wrong lane | `STP on lane 2` | `framing_lane` | true | `symbol`, `lane`, `error` | both |
 | PAD outside a packet | `PAD outside a packet (lane 5)` | `pad_misplaced` | true | `lane`, `error` | both |
 | Withheld data | §12.11 | `unaligned` | §12.11 | `symbols`, then `error` when an error | both |
+
+**Runs.** With more than one lane bound, `pad_misplaced` and `unknown_os`
+(§6) are reported as runs, so a stuck lane gives one error, not one per row
+or round. Consecutive `pad_misplaced` errors on one lane, or `unknown_os`
+errors with one `symbol`, form a run. Any other transaction of the
+decoder's pipeline ends it, except Idle; lane-level (§12.12) and edge-level
+(§12.8) transactions do not. A run spans its first to its last occurrence
+and has its first occurrence's fields. When it counts more than one, the
+label gains ` (N times)` and the fields gain `occurrences`, last:
+`PAD outside a packet (lane 2) (12 times)`.
 
 Spans: `link_width`, `lane_order` and `lanes_aligned` span the round's
 present ordered sets (earliest start to latest end). A `lane_skew` at a

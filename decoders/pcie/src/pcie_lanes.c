@@ -563,13 +563,34 @@ static bool in_link(const pcie_lanes *ln, unsigned l) {
     return false;
 }
 
-// §12.5 rule 1: whether the lane's next item after its head ordered set is
-// an ordered set (one in progress counts).
-static bool next_is_os(pcie_lane *l) {
-    if (l->count >= 2u) {
-        return item_at(l, 1)->kind == PCIE_ITEM_OS;
+// §12.5 rule 1: the lane's next item after its head ordered set, skipping
+// SKP ordered sets. One in progress counts once its type is known.
+typedef enum ts2_next { NEXT_NOT_OS, NEXT_OS, NEXT_PENDING } ts2_next;
+
+static ts2_next next_after_skps(pcie_lane *l, bool flushing) {
+    for (size_t i = 1; i < l->count; i++) {
+        const pcie_lane_item *it = item_at(l, i);
+        if (it->kind != PCIE_ITEM_OS) {
+            return NEXT_NOT_OS;
+        }
+        if (it->os.type != PCIE_OS_SKP) {
+            return NEXT_OS;
+        }
     }
-    return l->pst != LPS_OUT;
+    switch (l->pst) {
+        case LPS_OUT:
+            return flushing ? NEXT_NOT_OS : NEXT_PENDING;
+        case LPS_OS_START: // COM only: it may still be a SKP OS
+        case LPS_SKP:
+            return NEXT_PENDING;
+        case LPS_TS:
+        case LPS_FTS:
+        case LPS_IDL:
+        case LPS_EIE:
+        case LPS_EIE_END:
+        default:
+            return NEXT_OS;
+    }
 }
 
 // §12.9: the first difference between a lane's ordered set and the round's.
@@ -696,6 +717,22 @@ static void align_round(pcie_lanes *ln, uint16_t members, const round_span *span
                memcmp(offsets, ln->last_offsets, sizeof offsets) != 0) {
         emit_aligned(ln, offsets, span);
     }
+    // §12.6: after a SKP round the offsets to compare with are taken again,
+    // silently, at the end of each lane's SKP OS, so an elastic buffer that
+    // adds or removes SKP symbols changes nothing.
+    uint64_t lowest_end = UINT64_MAX;
+    for (unsigned i = 0; i < ln->width; i++) {
+        const pcie_lane_item *it = front(lane_of(ln, ln->link[i]));
+        if (it->os.type != PCIE_OS_SKP) {
+            return;
+        }
+        const uint64_t end = it->index + it->os.n;
+        lowest_end = end < lowest_end ? end : lowest_end;
+    }
+    for (unsigned i = 0; i < ln->width; i++) {
+        const pcie_lane_item *it = front(lane_of(ln, ln->link[i]));
+        ln->last_offsets[i] = it->index + it->os.n - lowest_end;
+    }
 }
 
 // §12.7, §12.9: the round's ordered set to the pipeline, with every bound
@@ -797,7 +834,7 @@ static uint16_t lanes_with(pcie_lanes *ln, uint16_t members, pcie_os_type type) 
 // §12.5: the two kinds of round that decide the link.
 static void round_link(pcie_lanes *ln, uint16_t members, unsigned ref, const round_span *span) {
     const pcie_os_type type = front(lane_of(ln, ref))->os.type;
-    if (type == PCIE_OS_TS2 && !next_is_os(lane_of(ln, ref))) {
+    if (type == PCIE_OS_TS2 && next_after_skps(lane_of(ln, ref), ln->flushing) == NEXT_NOT_OS) {
         const uint16_t set = lanes_with(ln, members, PCIE_OS_TS2);
         if (set != 0) {
             apply_link(ln, set, false, span);
@@ -808,7 +845,7 @@ static void round_link(pcie_lanes *ln, uint16_t members, unsigned ref, const rou
         const uint16_t set = lanes_with(ln, members, PCIE_OS_SKP);
         unsigned w = 0;
         for (unsigned l = 0; l < ln->bound; l++) {
-            w += (set >> l) & 1u;
+            w += ((unsigned)set >> l) & 1u;
         }
         const unsigned usable = is_link_width(w) ? w : width_below(w);
         if (usable > (ln->decided ? ln->width : 0u)) {
@@ -889,6 +926,12 @@ static bool try_round(pcie_lanes *ln) {
             (opener || it->index >= first)) {
             members = (uint16_t)(members | (1u << l));
         }
+    }
+    // §12.5 rule 1: a TS2 round waits until its reference lane shows what
+    // follows the TS2 and any SKP ordered sets after it.
+    pcie_lane *ref = lane_of(ln, round_ref(ln, members));
+    if (front(ref)->os.type == PCIE_OS_TS2 && next_after_skps(ref, ln->flushing) == NEXT_PENDING) {
+        return false;
     }
     process_round(ln, members);
     return true;

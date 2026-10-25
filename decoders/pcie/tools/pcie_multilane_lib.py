@@ -45,7 +45,8 @@ ML_ERROR_TEXT = {
     "unaligned": "Packet data after lane alignment was lost is not decoded.",
 }
 
-TYPE_NAME = {"ts1": "TS1", "ts2": "TS2", "skp": "SKP", "fts": "FTS", "eios": "EIOS", "eieos": "EIEOS"}
+TYPE_NAME = {"ts1": "TS1", "ts2": "TS2", "skp": "SKP", "fts": "FTS", "eios": "EIOS", "eieos": "EIEOS",
+             "unknown": "unknown"}
 
 
 # ── 1. Ordered sets and lane symbols ─────────────────────────────────────────
@@ -53,15 +54,19 @@ TYPE_NAME = {"ts1": "TS1", "ts2": "TS2", "skp": "SKP", "fts": "FTS", "eios": "EI
 @dataclass(frozen=True)
 class Os:
     """One lane's copy of an ordered set (protocol-notes §2)."""
-    kind: str                 # ts1 ts2 skp fts eios eieos
+    kind: str                 # ts1 ts2 skp fts eios eieos unknown
     link: int | None = None   # TS: Link#, None = PAD
     lane: int | None = None   # TS: Lane#, None = PAD
     n_fts: int = 24
     rate: int = 0x02
     ctrl: int = 0x00
     skp: int = 3              # SKP OS: SKP symbols (1-5)
+    raw: tuple = ()           # unknown: COM, then symbols ending with the misfit (SPEC §12.3)
 
     def symbols(self) -> list[tuple[int, bool]]:
+        if self.kind == "unknown":
+            assert self.raw and self.raw[0] == (COM, True)
+            return list(self.raw)
         if self.kind in ("ts1", "ts2"):
             ident = TS1_ID if self.kind == "ts1" else TS2_ID
             body = [(PAD, True) if v is None else (v, False) for v in (self.link, self.lane)]
@@ -792,7 +797,10 @@ class LaneModel:
 
         # §12.5 the link
         its_r = self.items[refl]
-        nxt = its_r[idx[refl] + 1] if idx[refl] + 1 < len(its_r) else None
+        j = idx[refl] + 1                 # rule 1 looks past SKP ordered sets
+        while j < len(its_r) and its_r[j].kind == "os" and its_r[j].os.kind == "skp":
+            j += 1
+        nxt = its_r[j] if j < len(its_r) else None
         if ro.kind == "ts2" and (nxt is None or nxt.kind != "os"):
             cands = [p for p in sorted(present) if present[p].os.kind == "ts2"
                      and present[p].os.link is not None and present[p].os.lane is not None]
@@ -817,6 +825,11 @@ class LaneModel:
                     self.skew_since = False
                 elif (len(self.link), offs) != self.last_al:
                     self.lanes_aligned(offs, span)
+                if all(present[p].os.kind == "skp" for p in self.link):
+                    # SKP add/remove is silent: compare the next round with
+                    # the offsets at the end of each lane's SKP OS.
+                    lo_end = min(present[p].b for p in self.link)
+                    self.last_al = (len(self.link), [present[p].b - lo_end for p in self.link])
             else:
                 first = next(p for p in self.link if p not in present)
                 if self.aligned:
@@ -942,6 +955,8 @@ def build_view(lk: Link, feed: list, tm: LaneTiming, hand: dict | None = None):
                                       ctrl=o.ctrl, key=o.key(), links=val.links, lanes=val.lanes))
             elif o.kind == "skp":
                 V._unit("skp", a, dict(n=o.skp, counts=val.skps))
+            elif o.kind == "unknown":
+                V._unit("os_unknown", a, dict(symbol=o.raw[-1][0]))
             else:
                 V._unit(o.kind, a)
             continue
@@ -1062,9 +1077,58 @@ def framing_txs(V: Stream, vt: ViewTiming, meta: list[tuple]) -> list[Tx]:
             if u.kind == "pad_fill":
                 nx = u.b + 1
                 assert nx >= len(V.syms) or meta[nx][0] != rid or not (V.syms[nx].k and V.syms[nx].byte == PAD)
-            else:
-                out.append(Tx(vt.start[u.a], vt.end[u.a], f"PAD outside a packet (lane {plane})", True,
-                              [("type", "pad_misplaced"), ("lane", plane), ("error", ML_ERROR_TEXT["pad_misplaced"])]))
+            # misplaced PADs are reported as runs (error_runs)
+    return out
+
+
+# Units that give no transaction ending a run (SPEC §12.12): nothing, or Idle.
+QUIET_PIPE = ("pad_fill", "pre_com", "dropped", "partial", "idle")
+QUIET_DLL = QUIET_PIPE + ("ts", "skp", "fts", "eios", "eieos")
+
+
+def error_runs(V: Stream, vt: ViewTiming, meta: list[tuple], pipe: bool) -> list[Tx]:
+    """SPEC §12.12: on a multi-lane link, consecutive misplaced PADs on one
+    lane, or Unknown ordered sets with one symbol, form a run: one error with
+    ` (N times)` and `occurrences` when N > 1. Any other transaction of the
+    decoder's pipeline but Idle ends the run; lane-level and edge-level ones
+    do not."""
+    out: list[Tx] = []
+    run: dict | None = None
+
+    def end() -> None:
+        nonlocal run
+        if run is None:
+            return
+        n = run["n"]
+        if run["key"][0] == "pad":
+            lane = run["key"][1]
+            label = f"PAD outside a packet (lane {lane})"
+            f = [("type", "pad_misplaced"), ("lane", lane), ("error", ML_ERROR_TEXT["pad_misplaced"])]
+        else:
+            label = "Unknown ordered set"
+            f = [("type", "unknown_os"), ("symbol", h2(run["key"][1])), ("error", L.ERROR_TEXT["unknown_os"])]
+        if n > 1:
+            label += f" ({n} times)"
+            f.append(("occurrences", n))
+        out.append(Tx(run["s"], run["e"], label, True, f))
+        run = None
+
+    for u in V.units:
+        if u.kind == "pad_misplaced":
+            key, span = ("pad", meta[u.a][2]), (vt.start[u.a], vt.end[u.a])
+        elif u.kind == "os_unknown":
+            key, span = ("uos", u.info["symbol"]), vt.span(u.a, u.b)
+        else:
+            if u.kind not in (QUIET_PIPE if pipe else QUIET_DLL) or u.info.get("wrong_lane"):
+                end()
+            continue
+        if run is not None and run["key"] == key:
+            run["e"] = span[1]
+            run["n"] += 1
+        else:
+            end()
+            run = dict(key=key, s=span[0], e=span[1], n=1)
+    end()
     return out
 
 
@@ -1089,9 +1153,10 @@ def ts_tx(run: dict, tm: ViewTiming) -> Tx:
     return Tx(s, e, f"{name}{mult} {lpart} lanes={lanes} n_fts={i['n_fts']} {gen}", False, fields)
 
 
-def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool) -> list[Tx]:
+def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool, runs: bool) -> list[Tx]:
     """pcie_fixture_lib.pipe_engine with SPEC §12.9 TS/SKP fields and the
-    §12.10 PAD units (fill: not decoded; misplaced: reported by framing_txs)."""
+    §12.10 PAD units (fill: not decoded; misplaced: reported by error_runs,
+    as are Unknown ordered sets when `runs`)."""
     out: list[Tx] = []
     run: dict | None = None
     idle: dict | None = None
@@ -1164,7 +1229,7 @@ def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool) -> l
             tail = "" if endn == "END" else ", EDB"
             out.append(Tx(s, e, f"TLP frame seq={seq} ({n} symbols{tail})", False,
                           [("type", "tlp_frame"), ("seq", seq), ("symbols", n), ("end", endn)]))
-        elif u.kind in ("pre_com", "dropped", "partial", "pad_misplaced"):
+        elif u.kind in ("pre_com", "dropped", "partial", "pad_misplaced") or (runs and u.kind == "os_unknown"):
             pass
         else:
             tx = L.common_error_tx(u, tm)
@@ -1175,8 +1240,9 @@ def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool) -> l
     return out
 
 
-def dll_engine(V: Stream, tm: ViewTiming) -> list[Tx]:
-    units = [u for u in V.units if u.kind not in ("pad_fill", "pad_misplaced")]
+def dll_engine(V: Stream, tm: ViewTiming, runs: bool) -> list[Tx]:
+    skip = ("pad_fill", "pad_misplaced") + (("os_unknown",) if runs else ())
+    units = [u for u in V.units if u.kind not in skip]
     return L.dll_engine(SimpleNamespace(units=units), tm)
 
 
@@ -1211,10 +1277,13 @@ def expected(lk: Link, lay: Layout, tfs: list[int], pfs: list[int], decoder: str
     rx = rxstatus_txs(lay, tm, rx_lanes) if pipe else []
     coalesce = params.get("coalesce", True)
     show_idle = params.get("show_idle", False)
+    runs = lay.B > 1
 
     def run(view: str) -> list[Tx]:
         L.check_view(V, view)
-        txs = pipe_engine(V, vt, coalesce, show_idle) if pipe else dll_engine(V, vt)
+        txs = pipe_engine(V, vt, coalesce, show_idle, runs) if pipe else dll_engine(V, vt, runs)
+        if runs:
+            txs += error_runs(V, vt, meta, pipe)
         return txs + ftx + lane_txs + model.xz + rx
 
     txs = L.select_scrambling(V, vt, params.get("scrambling", "auto"), run)
