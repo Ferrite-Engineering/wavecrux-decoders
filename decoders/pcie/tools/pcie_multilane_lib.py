@@ -1188,12 +1188,15 @@ def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool, runs
         if u.kind == "idle":
             end_run()
             if show_idle:
-                if idle is not None and idle["b"] + 1 == u.a:
-                    idle["b"] = u.b
+                if idle is not None and idle["last"] + 1 == u.a:
+                    idle["b"] = idle["last"] = u.b
                     idle["n"] += u.b - u.a + 1
                 else:
                     end_idle()
-                    idle = dict(a=u.a, b=u.b, n=u.b - u.a + 1)
+                    idle = dict(a=u.a, b=u.b, last=u.b, n=u.b - u.a + 1)
+            continue
+        if u.kind == "pad_misplaced" and idle is not None:
+            idle["last"] = u.b      # §12.12: a PAD in a row does not split an Idle run
             continue
         end_idle()
         if u.kind in ("ts", "fts", "eieos"):

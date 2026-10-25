@@ -263,7 +263,11 @@ static void out_symbol(pcie_pipeline *p, const pcie_sym *s, uint8_t value) {
         run_extend(p, value == PCIE_D_IDLE ? PCIE_RUN_IDLE : PCIE_RUN_STRAY, s, value);
         return;
     }
-    run_end(p);
+    // §12.12: a PAD in a row does not split an Idle run, so a lane stuck on
+    // PAD in idle rows gives one Idle run beside its pad_misplaced run.
+    if (!(s->byte == PCIE_K_PAD && s->width >= 2u && p->run == PCIE_RUN_IDLE)) {
+        run_end(p);
+    }
     switch (s->byte) {
         case PCIE_K_COM:
             start_os(p, s);

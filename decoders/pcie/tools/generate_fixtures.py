@@ -1790,9 +1790,7 @@ def _(lk: M.Link) -> None:
 
 # A SKP right after the last TS2 of a reversed link: the TS2 run still ends there (rule 1 skips SKP),
 # so the link keeps Lane order 3,2,1,0 and packets decode; not a link "from SKP" in physical order.
-@multilane("pipe_x4_ts2_then_skp_w16_10ps", "SKP right after the last TS2: rule 1 looks past it, Lane order 3,2,1,0 holds, packets decode",
-           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
-def _(lk: M.Link) -> None:
+def ts2_then_skp_body(lk: M.Link) -> None:
     M.train(lk, order=[3, 2, 1, 0])
     lk.skp()
     lk.idle_rows(4)
@@ -1802,6 +1800,19 @@ def _(lk: M.Link) -> None:
     lk.idle_rows(2)
     lk.log.dllp(REV_DLLP2)
     lk.idle_rows(4)
+
+
+@multilane("pipe_x4_ts2_then_skp_w16_10ps", "SKP right after the last TS2: rule 1 looks past it, Lane order 3,2,1,0 holds, packets decode",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    ts2_then_skp_body(lk)
+
+
+# The same with max_skew 0: the round settles while the SKP is still arriving, so it waits for what follows it.
+@multilane("pipe_x4_ts2_then_skp_skew0_w16_10ps", "SKP after the last TS2 at max_skew 0: the TS2 round waits past the SKP, same result",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off", "max_skew": 0})
+def _(lk: M.Link) -> None:
+    ts2_then_skp_body(lk)
 
 
 # Lane 2 stuck on PAD in idle rows (show_idle on): one run per stretch, not one error per row; Idle does not end it,

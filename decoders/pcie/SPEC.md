@@ -812,8 +812,8 @@ present.
   width or the offsets differ from the last ones.
 - **SKP add/remove is silent.** After a complete round whose ordered sets
   on the link lanes are all SKP OSes, the last offsets are taken again,
-  without a transaction, at the end of each lane's SKP OS (its last symbol's
-  index, minus the lowest of them). An elastic buffer that adds or removes
+  without a transaction, at the end of each lane's SKP OS (the index just
+  past its last symbol, minus the lowest of them). An elastic buffer that adds or removes
   SKP symbols moves the next COM on that lane, and this keeps it from
   emitting `lanes_aligned`.
 - **Loss**: while aligned, a round that is not complete, or a row that
@@ -955,6 +955,16 @@ decoder's pipeline ends it, except Idle; lane-level (§12.12) and edge-level
 and has its first occurrence's fields. When it counts more than one, the
 label gains ` (N times)` and the fields gain `occurrences`, last:
 `PAD outside a packet (lane 2) (12 times)`.
+
+- A PAD in a row does not split an Idle run (§7), so with `show_idle` a
+  lane stuck on PAD in idle rows gives one Idle run too. It still ends a
+  run of data outside a packet.
+- A run is emitted when it ends, so transactions that start inside its span
+  can come before it. Transactions are not ordered by time; the fixtures
+  compare them sorted (`wcxhost --sort`).
+- In `auto` scrambling a run is buffered when it ends. If the lock is
+  undetermined at flush, "the last buffered transaction" (§10.5) can be
+  that run, and the info transaction then spans it.
 
 Spans: `link_width`, `lane_order` and `lanes_aligned` span the round's
 present ordered sets (earliest start to latest end). A `lane_skew` at a
