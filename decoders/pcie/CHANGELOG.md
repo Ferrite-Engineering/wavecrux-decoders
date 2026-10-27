@@ -19,7 +19,8 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
   `lane_order`, `lanes_aligned`, `lane_skew`, `lane_mismatch`,
   `framing_lane`, `pad_misplaced`, `unaligned`; TS1/TS2 carry `links` and
   `lanes`, SKP OS per-lane counts, RxStatus its lane. A SKP right after the
-  last TS2 does not hide the end of the TS2 run, SKP add/remove does not
+  last TS2 does not hide the end of the TS2 run (up to 16 SKP OSs; at 16
+  the run ends), SKP add/remove does not
   emit `lanes_aligned`, and a stuck lane gives `pad_misplaced` and
   `unknown_os` runs with `occurrences`, not one error per row. With one lane
   bound the output is unchanged. Requested in #8.

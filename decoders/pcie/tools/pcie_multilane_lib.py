@@ -45,6 +45,8 @@ ML_ERROR_TEXT = {
     "unaligned": "Packet data after lane alignment was lost is not decoded.",
 }
 
+TS2_SKP_LOOKAHEAD = 16               # §12.5 rule 1: SKP OSs looked past after a TS2
+
 TYPE_NAME = {"ts1": "TS1", "ts2": "TS2", "skp": "SKP", "fts": "FTS", "eios": "EIOS", "eieos": "EIEOS",
              "unknown": "unknown"}
 
@@ -797,10 +799,13 @@ class LaneModel:
 
         # §12.5 the link
         its_r = self.items[refl]
-        j = idx[refl] + 1                 # rule 1 looks past SKP ordered sets
-        while j < len(its_r) and its_r[j].kind == "os" and its_r[j].os.kind == "skp":
+        j = idx[refl] + 1                 # rule 1 looks past SKP ordered sets,
+        skps = 0                          # at most TS2_SKP_LOOKAHEAD: then the run ends
+        while (j < len(its_r) and its_r[j].kind == "os" and its_r[j].os.kind == "skp"
+               and skps < TS2_SKP_LOOKAHEAD):
             j += 1
-        nxt = its_r[j] if j < len(its_r) else None
+            skps += 1
+        nxt = None if skps == TS2_SKP_LOOKAHEAD else (its_r[j] if j < len(its_r) else None)
         if ro.kind == "ts2" and (nxt is None or nxt.kind != "os"):
             cands = [p for p in sorted(present) if present[p].os.kind == "ts2"
                      and present[p].os.link is not None and present[p].os.lane is not None]

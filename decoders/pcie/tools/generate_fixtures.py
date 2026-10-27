@@ -1815,6 +1815,44 @@ def _(lk: M.Link) -> None:
     ts2_then_skp_body(lk)
 
 
+# §12.5 rule 1 looks past at most 16 SKP OSs after the last TS2. A reversed link, n SKPs, then training
+# again in physical order: below the cap the first TS2 run is not over (a TS1 follows), so only the second
+# decides; at the cap the first run ends there and decides Lane order 3,2,1,0, then the second goes physical.
+def ts2_skp_cap_body(lk: M.Link, n: int) -> None:
+    M.train(lk, order=[3, 2, 1, 0])
+    for _ in range(n):
+        lk.skp()
+    M.train(lk)
+    lk.idle_rows(4)
+    lk.log.dllp(REV_DLLP1)
+    lk.idle_rows(4)
+
+
+@multilane("pipe_x4_ts2_skp_below_cap_w16_10ps", "15 SKP OSs after the last TS2: rule 1 looks past them, the TS2 run goes on, so the link comes from SKP",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    ts2_skp_cap_body(lk, M.TS2_SKP_LOOKAHEAD - 1)
+
+
+@multilane("pipe_x4_ts2_skp_at_cap_w16_10ps", "16 SKP OSs after the last TS2: the TS2 run ends at the cap, Lane order 3,2,1,0, then physical",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    ts2_skp_cap_body(lk, M.TS2_SKP_LOOKAHEAD)
+
+
+# 300 SKP OSs after the last TS2 (more than a lane queue holds): the run ends at the cap, no internal error,
+# the TS2 run row and the packets decode.
+@multilane("pipe_x4_ts2_skp_flood_w16_10ps", "300 SKP OSs after the last TS2: the run ends at the cap, no lane queue overflow, packets decode",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk, order=[3, 2, 1, 0])
+    for _ in range(300):
+        lk.skp()
+    lk.idle_rows(4)
+    lk.log.dllp(REV_DLLP1)
+    lk.idle_rows(4)
+
+
 # Lane 2 stuck on PAD in idle rows (show_idle on): one run per stretch, not one error per row; Idle does not end it,
 # the DLLP does; PAD on lane 1 is a run of its own.
 @multilane("pipe_x4_pad_stuck_w16_1ns", "PAD stuck on one lane: pad_misplaced runs with (N times) and occurrences; Idle does not end a run",

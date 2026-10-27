@@ -30,6 +30,10 @@
 // next item is still unknown, until max_skew + 17 symbols past its COM.
 #define ROUND_SETTLE 17u
 
+// §12.5 rule 1: the most SKP ordered sets a TS2 round looks past. At the
+// cap the TS2 run ends, so a lane holds at most this many while it waits.
+#define TS2_SKP_LOOKAHEAD 16u
+
 // "0,1,2,3": 16 entries of at most 20 digits and 15 commas, with room.
 #define LIST_CAP 352u
 
@@ -564,10 +568,12 @@ static bool in_link(const pcie_lanes *ln, unsigned l) {
 }
 
 // §12.5 rule 1: the lane's next item after its head ordered set, skipping
-// SKP ordered sets. One in progress counts once its type is known.
+// SKP ordered sets. One in progress counts once its type is known. After
+// TS2_SKP_LOOKAHEAD of them the run ends, as if a row symbol followed.
 typedef enum ts2_next { NEXT_NOT_OS, NEXT_OS, NEXT_PENDING } ts2_next;
 
 static ts2_next next_after_skps(pcie_lane *l, bool flushing) {
+    unsigned skps = 0;
     for (size_t i = 1; i < l->count; i++) {
         const pcie_lane_item *it = item_at(l, i);
         if (it->kind != PCIE_ITEM_OS) {
@@ -575,6 +581,9 @@ static ts2_next next_after_skps(pcie_lane *l, bool flushing) {
         }
         if (it->os.type != PCIE_OS_SKP) {
             return NEXT_OS;
+        }
+        if (++skps == TS2_SKP_LOOKAHEAD) {
+            return NEXT_NOT_OS;
         }
     }
     switch (l->pst) {

@@ -771,7 +771,8 @@ decided, or decided again, at two kinds of round:
    round's reference lane's next item that is not a SKP OS is not an
    ordered set (it is a row symbol or a gap, or the trace ends). A SKP OS
    may follow the last TS2, so it does not continue the run; the round
-   waits until that item is known. The link becomes the present lanes
+   waits until that item is known. It looks past at most 16 SKP OSs: once
+   16 follow the TS2, the run ends there, as if a row symbol followed. The link becomes the present lanes
    whose ordered set here is a TS2 with Link# and Lane# both not PAD. If
    there are none, nothing changes.
 2. **SKP**: while the link has never been decided by rule 1, a round whose
