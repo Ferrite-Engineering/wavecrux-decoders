@@ -13,7 +13,8 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
   `data15`/`datak15` and per-lane `rxvalid`, `txelecidle`, `rxstatus`.
   Lane deskew on the ordered sets (`max_skew`, default 8 symbols), the link
   width from the TS2s at the end of training or, in a trace that starts in
-  L0, from SKP (widened by a later SKP on more lanes), lane
+  L0, from SKP (widened by a later SKP on more lanes; never once a TS1/TS2
+  was seen, so a SKP during Polling does not decide it), lane
   reversal from Lane# (`lane_order`), per-lane descrambling, un-striping,
   start-lane and PAD-fill checks. New transactions: `link_width`,
   `lane_order`, `lanes_aligned`, `lane_skew`, `lane_mismatch`,

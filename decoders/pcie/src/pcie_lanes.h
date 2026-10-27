@@ -145,7 +145,8 @@ typedef struct pcie_lanes {
     bool flushing;
     // The link (§12.5).
     bool decided;
-    bool by_ts2; // decided by §12.5 rule 1: only link lanes are considered
+    bool by_ts2;  // decided by §12.5 rule 1: only link lanes are considered
+    bool seen_ts; // a round's ordered set was a TS1/TS2: rule 2 is off
     unsigned width;
     uint8_t link[PCIE_MAX_LANES]; // physical lanes in logical order
     uint16_t considered;          // §12.4

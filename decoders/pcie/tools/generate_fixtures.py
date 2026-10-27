@@ -1816,8 +1816,8 @@ def _(lk: M.Link) -> None:
 
 
 # §12.5 rule 1 looks past at most 16 SKP OSs after the last TS2. A reversed link, n SKPs, then training
-# again in physical order: below the cap the first TS2 run is not over (a TS1 follows), so only the second
-# decides; at the cap the first run ends there and decides Lane order 3,2,1,0, then the second goes physical.
+# again in physical order: below the cap the first TS2 run is not over (a TS1 follows), and the SKPs after a
+# TS2 do not decide (rule 2 is off once a TS1/TS2 was seen), so only the second run decides; at the cap the first run ends there and decides Lane order 3,2,1,0, then the second goes physical.
 def ts2_skp_cap_body(lk: M.Link, n: int) -> None:
     M.train(lk, order=[3, 2, 1, 0])
     for _ in range(n):
@@ -1828,7 +1828,7 @@ def ts2_skp_cap_body(lk: M.Link, n: int) -> None:
     lk.idle_rows(4)
 
 
-@multilane("pipe_x4_ts2_skp_below_cap_w16_10ps", "15 SKP OSs after the last TS2: rule 1 looks past them, the TS2 run goes on, so the link comes from SKP",
+@multilane("pipe_x4_ts2_skp_below_cap_w16_10ps", "15 SKP OSs after the last TS2: rule 1 looks past them, the TS2 run goes on; SKP does not decide after a TS2, the second run does",
            "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
 def _(lk: M.Link) -> None:
     ts2_skp_cap_body(lk, M.TS2_SKP_LOOKAHEAD - 1)
@@ -1838,6 +1838,22 @@ def _(lk: M.Link) -> None:
            "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
 def _(lk: M.Link) -> None:
     ts2_skp_cap_body(lk, M.TS2_SKP_LOOKAHEAD)
+
+
+# Polling TS2s (Link#/Lane# PAD) with a SKP between them, as in a captured x4 trace (#8): the SKP does not
+# decide the link (rule 2 is off after a TS1/TS2). Configuration then numbers only lanes 0-1, reversed:
+# the first link is x2, Lane order 1,0, with no x4 "from SKP" before it.
+@multilane("pipe_x4_polling_skp_w16_10ps", "SKP between Polling TS2s (PAD Link#/Lane#) does not decide; Configuration gives x2, Lane order 1,0",
+           "pipe", 2, 4, Clocking((10, "ps"), period=800), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    lk.ts("ts1", None, None, count=2)
+    lk.ts("ts2", None, None, count=2)
+    lk.skp()
+    lk.ts("ts2", None, None, count=2)
+    M.train(lk, order=[1, 0], polling=0)
+    lk.idle_rows(4)
+    lk.log.dllp(Dllp("ack", seq=0))
+    lk.idle_rows(4)
 
 
 # 300 SKP OSs after the last TS2 (more than a lane queue holds): the run ends at the cap, no internal error,

@@ -568,6 +568,7 @@ class LaneModel:
         self.ptr = [0] * bound
         self.link: list[int] | None = None
         self.rule1 = False                        # decided by a TS2 run (rule 1)
+        self.seen_ts = False                      # a round's ordered set was a TS1/TS2 (rule 2 off)
         self.aligned = False
         self.order_state: tuple | None = None    # None = physical
         self.last_al: tuple | None = None
@@ -811,10 +812,13 @@ class LaneModel:
                      and present[p].os.link is not None and present[p].os.lane is not None]
             if cands:
                 self.decide(cands, "ts2", present, span)
-        elif not self.rule1 and ro.kind == "skp":
+        elif not self.seen_ts and ro.kind == "skp":
             cands = [p for p in sorted(present) if present[p].os.kind == "skp"]
             if self.cut_width(len(cands)) > (len(self.link) if self.link is not None else 0):
                 self.decide(cands, "skp", present, span)
+
+        if ro.kind in ("ts1", "ts2"):
+            self.seen_ts = True
 
         # §12.6 alignment
         loss = False

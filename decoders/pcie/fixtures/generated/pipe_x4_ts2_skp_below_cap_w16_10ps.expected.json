@@ -3,8 +3,6 @@
 {"startTime":13600,"endTime":20000,"label":"TS1 link=0 lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","links":"0,0,0,0","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":20000,"endTime":32800,"label":"TS1 ×2 link=0 lanes=3,2,1,0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"0,0,0,0","lanes":"3,2,1,0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":32800,"endTime":52000,"label":"TS2 ×3 link=0 lanes=3,2,1,0 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"3,2,1,0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
-{"startTime":52000,"endTime":53600,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
-{"startTime":52000,"endTime":53600,"label":"Link width x4 (4 bound, from SKP)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"skp"}},
 {"startTime":52000,"endTime":53600,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
 {"startTime":53600,"endTime":55200,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
 {"startTime":55200,"endTime":56800,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
@@ -24,5 +22,7 @@
 {"startTime":88800,"endTime":95200,"label":"TS1 link=0 lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","links":"0,0,0,0","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":95200,"endTime":108000,"label":"TS1 ×2 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":108000,"endTime":127200,"label":"TS2 ×3 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":120800,"endTime":127200,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
+{"startTime":120800,"endTime":127200,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
 {"startTime":128800,"endTime":129600,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
 ]

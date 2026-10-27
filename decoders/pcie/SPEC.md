@@ -775,12 +775,14 @@ decided, or decided again, at two kinds of round:
    16 follow the TS2, the run ends there, as if a row symbol followed. The link becomes the present lanes
    whose ordered set here is a TS2 with Link# and Lane# both not PAD. If
    there are none, nothing changes.
-2. **SKP**: while the link has never been decided by rule 1, a round whose
-   ordered set is a SKP OS, when the present lanes whose ordered set is a
+2. **SKP**: while no round so far has had a TS1 or TS2 as its ordered set
+   (a trace that starts in L0), a round whose ordered set is a SKP OS, when the present lanes whose ordered set is a
    SKP OS make a wider link than the current one (after the width rule
    below; an undecided link has width 0). The link becomes those lanes. So
    a trace that starts inside one lane's first SKP still reaches its full
-   width at the next SKP.
+   width at the next SKP. In training, SKPs between Polling TS1/TS2s
+   (Link# and Lane# PAD) do not decide the link: the TS2 run at the end of
+   Configuration does.
 
 Once decided by rule 1, only the link's lanes are considered, so the link
 can shrink at a later TS2 run but not grow.

@@ -848,9 +848,10 @@ static void round_link(pcie_lanes *ln, uint16_t members, unsigned ref, const rou
         if (set != 0) {
             apply_link(ln, set, false, span);
         }
-    } else if (!ln->by_ts2 && type == PCIE_OS_SKP) {
-        // §12.5 rule 2: a wider link than the current one, after the width
-        // rule; an undecided link has width 0.
+    } else if (!ln->seen_ts && type == PCIE_OS_SKP) {
+        // §12.5 rule 2, only before any TS1/TS2 round: a wider link than
+        // the current one, after the width rule; an undecided link has
+        // width 0.
         const uint16_t set = lanes_with(ln, members, PCIE_OS_SKP);
         unsigned w = 0;
         for (unsigned l = 0; l < ln->bound; l++) {
@@ -860,6 +861,9 @@ static void round_link(pcie_lanes *ln, uint16_t members, unsigned ref, const rou
         if (usable > (ln->decided ? ln->width : 0u)) {
             apply_link(ln, set, true, span);
         }
+    }
+    if (type == PCIE_OS_TS1 || type == PCIE_OS_TS2) {
+        ln->seen_ts = true;
     }
 }
 
