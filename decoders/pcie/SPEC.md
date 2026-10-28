@@ -53,6 +53,14 @@ interface; §11 specifies them, and §2-§4 do not apply to them:
 | `txelecidle` | 1 | no | When bound and 1 at a sampled edge, that edge's symbols are ignored. Unbound = never idle. |
 | `rxstatus` | 3 | no | PIPE RxStatus; PIPE decoder only (§4.6). The DLL decoder declares it and ignores it, so one binding set fits both. |
 
+Two lane-0 signals declare extra names for WaveCrux's auto-bind (ABI 1.3
+`auto_bind`; an older host ignores it):
+
+| Signal | `aliases` | `suffixes` |
+|---|---|---|
+| `datak` | `data_k` | `_data_k`, `_datak`, `_k` |
+| `rxvalid` | `rx_active`, `rx_valid` | `_rx_valid`, `_rxvalid`, `_rx_active` |
+
 ## 3. Parameters
 
 | Name | Kind | Values | Default | Decoders |

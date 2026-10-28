@@ -60,6 +60,51 @@ WCX_TEST(ten_decoders_register_in_spec_order) {
     }
 }
 
+// A name list from an auto_bind object, joined with commas.
+static void join_names(const wcx_manifest *m, size_t arr, char *out, size_t cap) {
+    out[0] = '\0';
+    if (arr == WCX_JSON_NONE) {
+        return;
+    }
+    size_t at = 0;
+    size_t e = arr + 1;
+    for (uint32_t i = 0; i < m->doc.toks[arr].size; i++, e = m->doc.toks[e].next) {
+        char name[32] = {0};
+        WCX_IGNORE(wcx_manifest_text(m, e, name, sizeof name));
+        const size_t n = strlen(name);
+        if (at + n + 2u >= cap) {
+            return;
+        }
+        if (i > 0) {
+            out[at++] = ',';
+        }
+        memcpy(out + at, name, n + 1u);
+        at += n;
+    }
+}
+
+// Signal `sig`'s auto_bind lists against §2.
+static void check_auto_bind_at(wcx_test *t, const wcx_manifest *m, size_t sig, const char *aliases,
+                               const char *suffixes) {
+    const size_t ab = m->signals[sig].auto_bind;
+    if (ab == WCX_JSON_NONE) {
+        WCX_FAIL("signal %lu has no auto_bind", (unsigned long)sig);
+        return;
+    }
+    char got[128] = {0};
+    join_names(m, wcx_jdoc_member(&m->doc, ab, "aliases"), got, sizeof got);
+    if (strcmp(got, aliases) != 0) {
+        WCX_FAIL("aliases \"%s\", expected \"%s\"", got, aliases);
+    }
+    join_names(m, wcx_jdoc_member(&m->doc, ab, "suffixes"), got, sizeof got);
+    if (strcmp(got, suffixes) != 0) {
+        WCX_FAIL("suffixes \"%s\", expected \"%s\"", got, suffixes);
+    }
+}
+
+#define CHECK_AUTO_BIND(m, sig, aliases, suffixes) \
+    check_auto_bind_at(t, (m), (sig), (aliases), (suffixes))
+
 WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
     WcDecoderDef defs[10];
     size_t n = 10;
@@ -102,6 +147,12 @@ WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
         WCX_CHECK_EQ_U64(m.signals[3].bit_width, 1);
         WCX_CHECK_EQ_U64(m.signals[4].bit_width, 1);
         WCX_CHECK_EQ_U64(m.signals[5].bit_width, 3);
+        // §2 auto_bind names: lane 0's datak and rxvalid only.
+        for (size_t s = 0; s < m.signal_count; s++) {
+            WCX_CHECK_EQ_U64(m.signals[s].auto_bind != WCX_JSON_NONE, s == 2u || s == 3u);
+        }
+        CHECK_AUTO_BIND(&m, 2, "data_k", "_data_k,_datak,_k");
+        CHECK_AUTO_BIND(&m, 3, "rx_active,rx_valid", "_rx_valid,_rxvalid,_rx_active");
         // §3 parameters: both have scrambling and sample_point (enums with
         // labels), max_skew (int) and lane_order (enum, §12.1); only the PIPE
         // decoder has coalesce and show_idle (bools).
