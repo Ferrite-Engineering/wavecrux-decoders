@@ -769,6 +769,108 @@ def _(st: Stream) -> None:
 def _(st: Stream) -> None:
     rxstatus_body(st)
 
+# SPEC §8.3: DLLP coalescing, every rule that starts or ends a run, at 16 bits under default auto.
+FC1_TRIPLET = [Dllp("initfc1_cpl", hdr=0, data=0), Dllp("initfc1_np", hdr=32, data=1),
+               Dllp("initfc1_p", hdr=32, data=1008)]     # Cpl NP P, the order one real DLL sends
+FC2_TRIPLET = [Dllp("initfc2_p", hdr=32, data=1008), Dllp("initfc2_np", hdr=32, data=1),
+               Dllp("initfc2_cpl", hdr=0, data=0)]
+UFC_P = Dllp("updatefc_p", vc=0, hdr=10, data=200)
+
+
+def coalesce_body(st: Stream) -> None:
+    st.skp()
+    # InitFC1 Cpl NP P three times, idle between DLLPs and a SKP OS inside
+    # the run; then Cpl NP, cut short by InitFC2 (two single DLLPs).
+    for i in range(3):
+        for d in FC1_TRIPLET:
+            st.dllp(d)
+            st.idle(1)
+        if i == 1:
+            st.skp()
+    st.dllp(FC1_TRIPLET[0])
+    st.dllp(FC1_TRIPLET[1])
+    # InitFC2 P NP Cpl twice, then a lone InitFC2-P before a TLP.
+    for _ in range(2):
+        for d in FC2_TRIPLET:
+            st.dllp(d)
+    st.dllp(FC2_TRIPLET[0])
+    st.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=41))
+    # UpdateFC-P x3 across idle and a SKP OS, ended by rxvalid gating; x2 after it.
+    st.dllp(UFC_P)
+    st.idle(3)
+    st.dllp(UFC_P)
+    st.skp()
+    st.dllp(UFC_P)
+    st.pad_idle()
+    st.gate("rxvalid", 2)
+    st.dllp(UFC_P)
+    st.dllp(UFC_P)
+    # Ack x3, a TS1, Ack x2; X/Z; Ack x2.
+    ack = Dllp("ack", seq=7)
+    for _ in range(3):
+        st.dllp(ack)
+    st.ts("ts1", 0, 0)
+    st.dllp(ack)
+    st.dllp(ack)
+    st.pad_idle()
+    st.xz(1)
+    st.dllp(ack)
+    st.dllp(ack)
+    # FTS, EIOS and EIEOS each end a run.
+    st.dllp(UFC_P)
+    st.fts(1)
+    st.dllp(UFC_P)
+    st.eios()
+    st.dllp(UFC_P)
+    st.eieos(1)
+    st.dllp(UFC_P)
+    # P P NP Cpl: the first P is a single, the triplet starts at the second.
+    p, np_, cpl = FC1_TRIPLET[2], FC1_TRIPLET[1], FC1_TRIPLET[0]
+    for d in (p, p, np_, cpl):
+        st.dllp(d)
+    # DLLPs that do not coalesce end a run: a CRC mismatch, a reserved type.
+    st.dllp(UFC_P)
+    st.dllp(UFC_P, crc=bytes([0x00, 0x00]))
+    st.dllp(UFC_P)
+    st.dllp(Dllp("ack", seq=8))
+    st.dllp(Dllp("reserved", byte0=0x01))
+    st.dllp(Dllp("ack", seq=8))
+    # So do data outside a packet and a DLLP length error.
+    st.dllp(UFC_P)
+    st.stray(bytes([0x55]))
+    st.dllp(UFC_P)
+    st.raw_dllp_bytes(bytes(5))
+    st.dllp(UFC_P)
+    # PM, Vendor and Nak runs; three InitFC2 of two VCs make no triplet.
+    for _ in range(3):
+        st.dllp(Dllp("pm_enter_l1"))
+    for _ in range(2):
+        st.dllp(Dllp("vendor", payload=0x00ABCD))
+    for _ in range(2):
+        st.dllp(Dllp("nak", seq=6))
+    st.dllp(Dllp("initfc2_p", vc=1, hdr=1, data=1))
+    st.dllp(Dllp("initfc2_np", vc=2, hdr=1, data=1))
+    st.dllp(Dllp("initfc2_cpl", vc=1, hdr=1, data=1))
+    # UpdateFC-NP x2 still open at the end of the trace (flush, §10.6).
+    for _ in range(2):
+        st.dllp(Dllp("updatefc_np", vc=3, hdr=3, data=0))
+    st.idle(2)
+    st.pad_idle()
+
+
+@fixture("dll_coalesce_w16_10ps", "§8.3 DLLP and InitFC triplet runs: SKP and idle inside, every kind of end, flush",
+         "dll", 2, Clocking((10, "ps"), period=800), names=VcdNames(rxvalid="rx_valid"))
+def _(st: Stream) -> None:
+    coalesce_body(st)
+
+
+# The same traffic with coalesce=false: one transaction per DLLP, no count.
+@fixture("dll_nocoalesce_w8_1ns", "coalesce=false on the DLL decoder: every DLLP its own transaction",
+         "dll", 1, Clocking((1, "ns"), period=4), names=VcdNames(rxvalid="rx_valid"),
+         params={"scrambling": "off", "coalesce": False})
+def _(st: Stream) -> None:
+    coalesce_body(st)
+
 
 # ── cases settled by SPEC §10 ────────────────────────────────────────────────
 
@@ -1378,6 +1480,30 @@ def _(st: L.SerialStream) -> None:
 def _(st: L.SerialStream) -> None:
     st.burst("gen2", rd=-1, prelock=[PRE])
     common_errors(st)
+
+# SPEC §8.3 on the serial DLL decoder: a disparity error between two DLLPs does not end their run; electrical idle does.
+@serial("serial_dll_coalesce_10ps", "serial DLL decoder: a line-level error inside a DLLP run, electrical idle ending one",
+        "serial_dll", (10, "ps"), params={"rate": "gen1", "scrambling": "off"})
+def _(st: L.SerialStream) -> None:
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.idle(2)
+    st.dllp(UFC_P)
+    st.idle(1)
+    st.wrong_rd(st.pos())        # the next D0.0: one disparity error, the symbol still idle
+    st.idle(1)
+    st.dllp(UFC_P)
+    st.dllp(UFC_P)
+    st.elec_idle(("x", 5 * NS))
+    st.burst("gen1", rd=-1, prelock=[PRE])
+    st.skp()
+    st.idle(2)
+    st.dllp(UFC_P)               # the same DLLP after electrical idle: a new run
+    st.dllp(UFC_P)
+    for d in FC1_TRIPLET * 2:
+        st.dllp(d)
+    st.idle(2)
+    st.eios()
 
 
 # The §10.2 framing errors through the serial symbol decoder, ending with a packet still open at the end of the trace.
@@ -1990,6 +2116,34 @@ def _(lk: M.Link) -> None:
     lk.at(1)
     lk.log.tlp(Tlp("MRd32", 1, rng_seed=282)).info["wrong_lane"] = True     # ends on lane 0
     lk.fill()
+    lk.idle_rows(1)
+    lk.skp()
+    lk.idle_rows(2)
+
+
+# SPEC §8.3 on x4: triplets over rows, a SKP inside a run; PAD fill does not end a run, framing_lane and pad_misplaced do.
+@multilane("dll_x4_coalesce_w8_10ps", "DLLP coalescing on x4: SKP and PAD fill inside a run; framing_lane, pad_misplaced end one",
+           "dll", 1, 4, Clocking((10, "ps"), period=400))
+def _(lk: M.Link) -> None:
+    M.train(lk)
+    lk.idle_rows(2)
+    for _ in range(3):
+        for d in FC1_TRIPLET:
+            lk.log.dllp(d)
+    lk.skp()
+    for _ in range(2):
+        for d in FC2_TRIPLET:
+            lk.log.dllp(d)
+    lk.log.dllp(UFC_P)
+    lk.log.dllp(UFC_P)
+    lk.at(2)
+    lk.log.dllp(UFC_P).info["wrong_lane"] = True     # SDP on lane 2: a new run starts here
+    lk.fill()
+    lk.log.dllp(UFC_P)
+    lk.at(3)
+    lk.pad_misplaced()
+    lk.log.dllp(UFC_P)
+    lk.log.dllp(UFC_P)
     lk.idle_rows(1)
     lk.skp()
     lk.idle_rows(2)

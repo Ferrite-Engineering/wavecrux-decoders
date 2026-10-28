@@ -147,7 +147,7 @@ WCX_TEST(serial_manifests_declare_line_and_parameters) {
         WCX_CHECK_STR_EQ(name, "line");
         WCX_CHECK_EQ_U64(m.signals[0].bit_width, 1);
         WCX_CHECK(!m.signals[0].optional);
-        WCX_CHECK_EQ_U64(m.param_count, i == 0u ? 5u : 3u);
+        WCX_CHECK_EQ_U64(m.param_count, i == 0u ? 5u : 4u);
         const size_t rate = wcx_manifest_find_param(&m, "rate");
         const size_t inv = wcx_manifest_find_param(&m, "invert");
         const size_t scr = wcx_manifest_find_param(&m, "scrambling");
@@ -158,7 +158,12 @@ WCX_TEST(serial_manifests_declare_line_and_parameters) {
         WCX_CHECK_EQ_U64(m.params[inv].kind, WCX_PARAM_BOOL);
         WCX_CHECK_EQ_U64(wcx_jdoc_type(&m.doc, m.params[inv].default_value), WCX_JT_FALSE);
         WCX_CHECK(wcx_jdoc_string_equals(&m.doc, m.params[scr].default_value, "auto"));
-        WCX_CHECK_EQ_U64(wcx_manifest_find_param(&m, "coalesce") != WCX_JSON_NONE, i == 0u);
+        // §11.1: both have coalesce (§7 or §8.3); only pcie_serial has show_idle.
+        const size_t co = wcx_manifest_find_param(&m, "coalesce");
+        WCX_REQUIRE(co != WCX_JSON_NONE);
+        WCX_CHECK_EQ_U64(m.params[co].kind, WCX_PARAM_BOOL);
+        WCX_CHECK_EQ_U64(wcx_jdoc_type(&m.doc, m.params[co].default_value), WCX_JT_TRUE);
+        WCX_CHECK_EQ_U64(wcx_manifest_find_param(&m, "show_idle") != WCX_JSON_NONE, i == 0u);
         WCX_CHECK_EQ_U64(wcx_manifest_find_param(&m, "sample_point"), WCX_JSON_NONE);
         wcx_manifest_free(&m);
     }

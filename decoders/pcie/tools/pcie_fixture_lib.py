@@ -1309,12 +1309,130 @@ def pipe_engine(st: Stream, tm: Timing, coalesce: bool, show_idle: bool) -> list
     return out
 
 
-def dll_engine(st: Stream, tm: Timing) -> list[Tx]:
+# SPEC §8.3: which InitFC kinds make a triplet, by level.
+TRIPLETS = {1: {"initfc1_p", "initfc1_np", "initfc1_cpl"}, 2: {"initfc2_p", "initfc2_np", "initfc2_cpl"}}
+PLAIN_NAMES = {"ack": "Ack", "nak": "Nak", "vendor": "Vendor"}
+
+
+def coalesces(u: Unit) -> bool:
+    """SPEC §8.3: a DLLP the transmitter sent with its correct CRC, of a
+    type that is not reserved."""
+    return (u.kind == "dllp" and u.info["end"] == END and u.info["crc"] == u.info["good_crc"]
+            and u.info["dllp"].kind != "reserved")
+
+
+def _triplet_level(ds: list[Dllp]) -> int | None:
+    for level, kinds in TRIPLETS.items():
+        if sorted(d.kind for d in ds) == sorted(kinds) and len({d.vc for d in ds}) == 1:
+            return level
+    return None
+
+
+def _single_run_tx(us: list[Unit], tm: Timing) -> Tx:
+    """`len(us)` identical DLLPs: SPEC §8.1, with ×N after the name, on the
+    short label and as `count` when N > 1."""
+    n = len(us)
+    first = dllp_tx(us[0], tm)
+    if n == 1:
+        return first
+    d: Dllp = us[0].info["dllp"]
+    k = d.kind
+    t = f" ×{n}"
+    if k in ("ack", "nak"):
+        label = f"{PLAIN_NAMES[k]}{t} seq={d.seq}"
+    elif k in PM_KINDS:
+        label = PM_KINDS[k][1] + t
+    elif k == "vendor":
+        label = f"Vendor{t} 0x{d.payload:06X}"
+    else:
+        label = f"{FC_KINDS[k][1]}{t} VC{d.vc} H={d.hdr} D={d.data}"
+    short = DLLP_SHORT[k] + (f" {d.seq}" if k in ("ack", "nak") else "") + t
+    fields = [("type", k), ("short_label", short), ("count", n)] + first.fields[2:]
+    s, _ = tm.span(us[0].a, us[0].b)
+    _, e = tm.span(us[-1].a, us[-1].b)
+    return Tx(s, e, label, False, fields)
+
+
+def _triplet_run_tx(groups: list[list[Unit]], level: int, tm: Timing) -> Tx:
+    n = len(groups)
+    t = f" ×{n}" if n > 1 else ""
+    by = {}
+    for u in groups[0]:
+        by[u.info["dllp"].kind.rsplit("_", 1)[1]] = u
+    vc = groups[0][0].info["dllp"].vc
+    fields: list = [("type", f"initfc{level}"), ("short_label", f"IFC{level}{t}")]
+    if n > 1:
+        fields.append(("count", n))
+    fields.append(("vc", vc))
+    text = []
+    for slot, name in (("p", "P"), ("np", "NP"), ("cpl", "Cpl")):
+        d = by[slot].info["dllp"]
+        fields += [(f"{slot}_hdr_fc", d.hdr), (f"{slot}_data_fc", d.data)]
+        text.append(f"{name} H={d.hdr} D={d.data}")
+    fields.append(("crc", ",".join(hexb(by[x].info["crc"]) for x in ("p", "np", "cpl"))))
+    s, _ = tm.span(groups[0][0].a, groups[0][0].b)
+    _, e = tm.span(groups[-1][-1].a, groups[-1][-1].b)
+    return Tx(s, e, f"InitFC{level}{t} VC{vc} " + ", ".join(text), False, fields)
+
+
+def dllp_runs(stretch: list[Unit], tm: Timing) -> list[Tx]:
+    """SPEC §8.3 over one stretch of coalescing DLLPs, from the encoder's
+    intents: triplets cut from the first DLLP, then runs of equal units."""
+    groups: list[list[Unit]] = []
+    i = 0
+    while i < len(stretch):
+        three = stretch[i:i + 3]
+        if len(three) == 3 and _triplet_level([u.info["dllp"] for u in three]) is not None:
+            groups.append(three)
+            i += 3
+        else:
+            groups.append([stretch[i]])
+            i += 1
+
+    def ident(g: list[Unit]) -> tuple:
+        return tuple(u.info["dllp"].bytes4() for u in g)
+
+    out = []
+    j = 0
+    while j < len(groups):
+        k = j
+        while k + 1 < len(groups) and ident(groups[k + 1]) == ident(groups[j]):
+            k += 1
+        run = groups[j:k + 1]
+        if len(run[0]) == 3:
+            out.append(_triplet_run_tx(run, _triplet_level([u.info["dllp"] for u in run[0]]), tm))
+        else:
+            out.append(_single_run_tx([g[0] for g in run], tm))
+        j = k + 1
+    return out
+
+
+def dll_engine(st: Stream, tm: Timing, coalesce: bool = True, breaks: frozenset = frozenset(),
+               silent: tuple = ()) -> list[Tx]:
+    """SPEC §8. `breaks`: symbol indexes a pipeline break comes right
+    before (gating, X/Z, electrical idle, lane alignment lost); `silent`:
+    unit kinds another engine reports that still end a stretch (§8.3)."""
     out: list[Tx] = []
     seqs = SeqTracker()
+    stretch: list[Unit] = []
+
+    def close() -> None:
+        nonlocal stretch
+        out.extend(dllp_runs(stretch, tm))
+        stretch = []
+
     for u in st.units:
-        if u.kind in ("ts", "skp", "fts", "eios", "eieos", "idle", "pre_com", "dropped", "partial"):
+        if u.a in breaks or u.info.get("wrong_lane"):
+            close()                 # a break, or the framing_lane error before this packet
+        if u.kind in ("skp", "idle", "pre_com", "dropped", "partial", "pad_fill"):
             continue
+        if u.kind in ("ts", "fts", "eios", "eieos") or u.kind in silent:
+            close()
+            continue
+        if coalesce and coalesces(u):
+            stretch.append(u)
+            continue
+        close()
         if u.kind in ("dllp", "dllp_badlen") and u.info["end"] == EDB:
             out.append(common_error_tx(Unit("dllp_edb", u.a, u.b, u.info), tm))
         elif u.kind == "dllp":
@@ -1337,6 +1455,7 @@ def dll_engine(st: Stream, tm: Timing) -> list[Tx]:
             tx = common_error_tx(u, tm)
             assert tx is not None, u.kind
             out.append(tx)
+    close()
     return out
 
 
@@ -1428,7 +1547,8 @@ def expected(st: Stream, edges: list[Edge], decoder: str, params: dict,
 
     def run(view: str) -> list[Tx]:
         check_view(st, view)
-        txs = pipe_engine(st, tm, coalesce, show_idle) if pipe else dll_engine(st, tm)
+        txs = pipe_engine(st, tm, coalesce, show_idle) if pipe else \
+            dll_engine(st, tm, coalesce, frozenset(st.specials))
         txs += [common_error_tx(u, tm) for u in xz_units]
         if pipe and rxstatus_bound:
             txs += rxstatus_txs(tm)
@@ -2326,7 +2446,8 @@ def expected_serial(st: SerialStream, line: SerialLine, samples: list[tuple[int,
 
     def run(view: str) -> list[Tx]:
         check_view(st, view)
-        txs = pipe_engine(st, tm, coalesce, show_idle) if pipe else dll_engine(st, tm)
+        txs = pipe_engine(st, tm, coalesce, show_idle) if pipe else \
+            dll_engine(st, tm, coalesce, frozenset(st.specials))
         return txs + line_txs
 
     mode = params.get("scrambling", "auto")

@@ -153,13 +153,19 @@ Readings the serial expectations take where §11 is silent:
    decoder reports `tlp_edb` (`bytes` = body - 6); the order of the length
    check and the EDB rule for TLPs is not specified, so it is not exercised.
    Inside a DLLP, `dllp_edb` wins over length (§10.8 item 7).
-6. **Still avoided**: a coalesced run or an idle run on both sides of an
-   electrical idle (asserted), a line-level error between two coalescable
-   ordered sets or inside a `show_idle` idle run, a code error inside a TS,
+6. **Still avoided**: a coalesced ordered-set run or an idle run on both
+   sides of an electrical idle (asserted), a line-level error between two
+   coalescable ordered sets or inside a `show_idle` idle run, a code error inside a TS,
    a slip whose misaligned group is a valid code, a trace ending in a held
    level after X, and `auto` scrambling that never locks (the order of
    line-level transactions in the undetermined buffer is not modelled; the
    generator refuses it).
+
+DLLP runs (SPEC §8.3) are modelled across breaks: the DLL engine ends a
+stretch of coalescing DLLPs at every break the stream lays out (gating, X/Z,
+electrical idle, and on a multi-lane link a loss of alignment), so
+`serial_dll_coalesce_10ps` sends the same DLLP on both sides of an electrical
+idle, and a disparity error inside a run.
 
 ## Multi-lane fixtures (SPEC §12)
 

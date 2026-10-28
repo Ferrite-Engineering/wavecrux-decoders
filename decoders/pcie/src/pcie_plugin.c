@@ -156,8 +156,8 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "and sequence tracking\","                                                            \
     "\"category\":\"highSpeed\"," MANIFEST_SIGNALS(                                       \
         width, kwidth) "\"parameters\":[" MANIFEST_PARAM_SCRAMBLING                       \
-                       "," MANIFEST_PARAM_SAMPLE_POINT "," MANIFEST_PARAM_MAX_SKEW        \
-                       "," MANIFEST_PARAM_LANE_ORDER "]}"
+                       "," MANIFEST_PARAM_SAMPLE_POINT "," MANIFEST_PARAM_COALESCE_DLLP   \
+                       "," MANIFEST_PARAM_MAX_SKEW "," MANIFEST_PARAM_LANE_ORDER "]}"
 
 // With 15 optional lanes (§12.1) a manifest is about 9 KB, over the 4095
 // characters C17 requires a compiler to accept in one string literal. GCC,
@@ -292,8 +292,8 @@ static bool pcie_init(wcx_decoder *d, void *state) {
         !wcx_param_enum(d, "sample_point", k_sample_points, 2, 0, &point)) {
         return false;
     }
-    if (!st->dll && (!wcx_param_bool(d, "coalesce", true, &coalesce) ||
-                     !wcx_param_bool(d, "show_idle", false, &show_idle))) {
+    if (!wcx_param_bool(d, "coalesce", true, &coalesce) ||
+        (!st->dll && !wcx_param_bool(d, "show_idle", false, &show_idle))) {
         return false;
     }
     int64_t max_skew = 0;

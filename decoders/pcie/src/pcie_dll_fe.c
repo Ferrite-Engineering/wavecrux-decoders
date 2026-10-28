@@ -11,8 +11,9 @@
 #include "pcie_crc.h"
 #include "pcie_fe_common.h"
 #include "wcx/json_writer.h"
+#include "wcx/str.h"
 
-#define DLLP_BODY      6u  // 4 bytes + CRC-16 (§8.1)
+#define DLLP_BODY      PCIE_DLLP_BYTES
 #define TLP_MIN_BODY   18u // 2 seq + 3-DW header + 4 LCRC (§8.2)
 #define TLP_FRAME_OVER 6u  // seq + LCRC around the TLP bytes
 #define SEQ_MOD        4096u
@@ -22,9 +23,10 @@
 // §10.1: the sentences of several problems are joined by one space.
 #define JOIN " "
 
-void pcie_dll_fe_init(pcie_dll_fe *fe, pcie_sink *sink) {
+void pcie_dll_fe_init(pcie_dll_fe *fe, pcie_sink *sink, bool coalesce) {
     memset(fe, 0, sizeof *fe);
     fe->sink = sink;
+    fe->coalesce = coalesce;
 }
 
 // ── DLLPs (§8.1) ───────────────────────────────────────────────────────────
@@ -67,6 +69,11 @@ static const dllp_kind *dllp_lookup(uint8_t byte0) {
     return NULL;
 }
 
+static bool dllp_crc_ok(const uint8_t *b, uint8_t want[2]) {
+    pcie_crc16_wire(pcie_crc16(b, 4), want);
+    return want[0] == b[4] && want[1] == b[5];
+}
+
 static void emit_dllp_length(pcie_dll_fe *fe, const pcie_event *ev) {
     wcx_arena *a = pcie_sink_arena(fe->sink);
     const unsigned long long n = ev->u.packet.length;
@@ -79,69 +86,89 @@ static void emit_dllp_length(pcie_dll_fe *fe, const pcie_event *ev) {
                    wcx_arena_printf(a, "DLLP length %llu, expected 6", n), wcx_json_end(&j), true);
 }
 
-// The label and the type-specific fields of one DLLP, `type` and
-// `short_label` first (§9).
-static const char *dllp_body(wcx_arena *a, wcx_json *j, const dllp_kind *k, const uint8_t *b) {
+// " ×N" for a run of N > 1 DLLPs or triplets (§8.3), else "".
+#define TIMES_CAP 32u
+
+static void times_suffix(uint64_t count, char out[TIMES_CAP]) {
+    out[0] = '\0';
+    if (count > 1u) {
+        WCX_IGNORE(
+            wcx_str_format(out, TIMES_CAP, " " PCIE_TIMES "%llu", (unsigned long long)count));
+    }
+}
+
+// Flow-control credits: b1 = rsvd[7:6] HdrFC[7:2]; b2 = HdrFC[1:0] rsvd
+// DataFC[11:8]; b3 = DataFC[7:0] (protocol-notes.md §5).
+static void fc_credits(const uint8_t *b, unsigned *hdr_fc, unsigned *data_fc) {
+    *hdr_fc = (((unsigned)b[1] & 0x3Fu) << 2u) | ((unsigned)b[2] >> 6u);
+    *data_fc = ((b[2] & 0x0Fu) << 8u) | b[3];
+}
+
+// The label and the type-specific fields of one DLLP, or of a run of
+// `count` identical ones (§8.3): `type`, `short_label`, then `count` when
+// the run holds more than one (§9).
+static const char *dllp_body(wcx_arena *a, wcx_json *j, const dllp_kind *k, const uint8_t *b,
+                             uint64_t count) {
     if (k == NULL) {
+        // A reserved DLLP never coalesces, so `count` is 1 here.
         wcx_json_add_str(j, "type", "reserved");
         wcx_json_add_str(j, "short_label", "Rsvd");
         wcx_json_add_hex(j, "byte0", b[0], 2);
         return wcx_arena_printf(a, "Reserved DLLP 0x%02X", (unsigned)b[0]);
     }
+    char times[TIMES_CAP];
+    times_suffix(count, times);
+    // Ack / Nak: AckNak_Seq_Num = {b2[3:0], b3} (PCIe Base 2.1 §3.4.1).
+    const bool acknak = k->byte0 == 0x00u || k->byte0 == 0x10u;
+    const unsigned seq = ((b[2] & 0x0Fu) << 8u) | b[3];
     wcx_json_add_str(j, "type", k->type);
-    if (k->byte0 == 0x00u || k->byte0 == 0x10u) {
-        const unsigned seq = ((b[2] & 0x0Fu) << 8u) | b[3];
-        wcx_json_add_str(j, "short_label", wcx_arena_printf(a, "%s %u", k->short_name, seq));
+    if (acknak) {
+        wcx_json_add_str(j, "short_label",
+                         wcx_arena_printf(a, "%s %u%s", k->short_name, seq, times));
+    } else if (count > 1u) {
+        wcx_json_add_str(j, "short_label", wcx_arena_printf(a, "%s%s", k->short_name, times));
     } else {
         wcx_json_add_str(j, "short_label", k->short_name);
     }
+    if (count > 1u) {
+        wcx_json_add_u64(j, "count", count);
+    }
     if (k->fc) {
-        // b0 = type | VC[2:0]; b1 = rsvd[7:6] HdrFC[7:2]; b2 = HdrFC[1:0] rsvd DataFC[11:8];
-        // b3 = DataFC[7:0] (protocol-notes.md §5).
         const unsigned vc = b[0] & 0x07u;
-        const unsigned hdr_fc = (((unsigned)b[1] & 0x3Fu) << 2u) | ((unsigned)b[2] >> 6u);
-        const unsigned data_fc = ((b[2] & 0x0Fu) << 8u) | b[3];
+        unsigned hdr_fc = 0;
+        unsigned data_fc = 0;
+        fc_credits(b, &hdr_fc, &data_fc);
         wcx_json_add_u64(j, "vc", vc);
         wcx_json_add_u64(j, "hdr_fc", hdr_fc);
         wcx_json_add_u64(j, "data_fc", data_fc);
-        return wcx_arena_printf(a, "%s VC%u H=%u D=%u", k->name, vc, hdr_fc, data_fc);
+        return wcx_arena_printf(a, "%s%s VC%u H=%u D=%u", k->name, times, vc, hdr_fc, data_fc);
     }
-    if (k->byte0 == 0x00u || k->byte0 == 0x10u) {
-        // Ack / Nak: AckNak_Seq_Num = {b2[3:0], b3} (PCIe Base 2.1 §3.4.1).
-        const unsigned seq = ((b[2] & 0x0Fu) << 8u) | b[3];
+    if (acknak) {
         wcx_json_add_u64(j, "seq", seq);
-        return wcx_arena_printf(a, "%s seq=%u", k->name, seq);
+        return wcx_arena_printf(a, "%s%s seq=%u", k->name, times, seq);
     }
     if (k->byte0 == 0x30u) {
         const unsigned payload = ((unsigned)b[1] << 16u) | ((unsigned)b[2] << 8u) | b[3];
         wcx_json_add_hex(j, "payload", payload, 6);
-        return wcx_arena_printf(a, "Vendor 0x%06X", payload);
+        return wcx_arena_printf(a, "Vendor%s 0x%06X", times, payload);
     }
-    return k->name; // the PM DLLPs carry nothing
+    // The PM DLLPs carry nothing.
+    return count > 1u ? wcx_arena_printf(a, "%s%s", k->name, times) : k->name;
 }
 
 #define RESERVED_SENTENCE "This DLLP type is reserved in PCIe Gen1 and Gen2."
 #define DLLP_CRC_SENTENCE "DLLP CRC-16 does not match its contents."
 
-static void emit_dllp(pcie_dll_fe *fe, const pcie_event *ev) {
-    const pcie_packet *p = &ev->u.packet;
-    if (p->edb) {
-        pcie_fe_emit_dllp_edb(fe->sink, ev); // §10.2: not decoded
-        return;
-    }
-    if (p->length != DLLP_BODY) {
-        emit_dllp_length(fe, ev);
-        return;
-    }
+// One DLLP of §8.1, or a run of `count` identical good ones (§8.3).
+static void emit_single(pcie_dll_fe *fe, const uint8_t *b, uint64_t count, uint64_t start_fs,
+                        uint64_t end_fs) {
     wcx_arena *a = pcie_sink_arena(fe->sink);
-    const uint8_t *b = p->head;
     const dllp_kind *k = dllp_lookup(b[0]);
     uint8_t want[2];
-    pcie_crc16_wire(pcie_crc16(b, 4), want);
-    const bool crc_ok = want[0] == b[4] && want[1] == b[5];
+    const bool crc_ok = dllp_crc_ok(b, want);
     wcx_json j;
     wcx_json_begin(&j, a);
-    const char *label = dllp_body(a, &j, k, b);
+    const char *label = dllp_body(a, &j, k, b, count);
     // The CRC bytes in wire order (§8.1: "0x35BC" for wire bytes 35 BC).
     wcx_json_add_hex(&j, "crc", ((unsigned)b[4] << 8u) | b[5], 4);
     if (!crc_ok) {
@@ -157,8 +184,178 @@ static void emit_dllp(pcie_dll_fe *fe, const pcie_event *ev) {
     } else if (!crc_ok) {
         wcx_json_add_str(&j, "error", DLLP_CRC_SENTENCE);
     }
-    pcie_sink_emit(fe->sink, ev->start_fs, ev->end_fs, label, wcx_json_end(&j),
-                   !crc_ok || k == NULL);
+    pcie_sink_emit(fe->sink, start_fs, end_fs, label, wcx_json_end(&j), !crc_ok || k == NULL);
+}
+
+// ── coalescing (§8.3) ──────────────────────────────────────────────────────
+
+// InitFC1-P/NP/Cpl have a high nibble of 4, 5, 6 and InitFC2 of C, D, E;
+// bit 3 must be clear (the VC is bits 2:0).
+static bool is_initfc(uint8_t b0) {
+    const unsigned low3 = ((unsigned)b0 >> 4u) & 0x07u;
+    return (b0 & 0x08u) == 0 && low3 >= 4u && low3 <= 6u;
+}
+
+// 0 = P, 1 = NP, 2 = Cpl, for an InitFC byte 0.
+static unsigned fc_slot(uint8_t b0) {
+    return ((unsigned)b0 >> 4u) & 0x03u;
+}
+
+// The `n` held DLLPs (1 to 3) can begin (n < 3) or make (n = 3) an InitFC
+// triplet: all InitFC1 or all InitFC2, one VC, and P, NP and Cpl at most
+// once each.
+static bool triplet_prefix(const pcie_dllp_item *h, unsigned n) {
+    unsigned seen = 0;
+    for (unsigned i = 0; i < n; i++) {
+        const uint8_t b0 = h[i].b[0];
+        // 0x87: the InitFC1/InitFC2 bit and the VC.
+        if (!is_initfc(b0) || (b0 & 0x87u) != (h[0].b[0] & 0x87u)) {
+            return false;
+        }
+        const unsigned bit = 1u << fc_slot(b0);
+        if ((seen & bit) != 0) {
+            return false;
+        }
+        seen |= bit;
+    }
+    return true;
+}
+
+// A triplet run: one transaction with the credits of P, NP and Cpl in that
+// order, whatever their order on the wire.
+static void emit_triplet(pcie_dll_fe *fe, const uint8_t *bytes, uint64_t count, uint64_t start_fs,
+                         uint64_t end_fs) {
+    wcx_arena *a = pcie_sink_arena(fe->sink);
+    const uint8_t *by_slot[PCIE_TRIPLET_DLLP] = {bytes, bytes, bytes};
+    for (unsigned i = 0; i < PCIE_TRIPLET_DLLP; i++) {
+        const uint8_t *b = bytes + (size_t)i * PCIE_DLLP_BYTES;
+        // A triplet's slots are 0-2 (triplet_prefix); the modulo only shows
+        // static analysis that the index stays in range.
+        by_slot[fc_slot(b[0]) % PCIE_TRIPLET_DLLP] = b;
+    }
+    unsigned hdr[PCIE_TRIPLET_DLLP] = {0};
+    unsigned data[PCIE_TRIPLET_DLLP] = {0};
+    for (unsigned s = 0; s < PCIE_TRIPLET_DLLP; s++) {
+        fc_credits(by_slot[s], &hdr[s], &data[s]);
+    }
+    const char level = (bytes[0] & 0x80u) != 0 ? '2' : '1';
+    const unsigned vc = bytes[0] & 0x07u;
+    char times[TIMES_CAP];
+    times_suffix(count, times);
+    wcx_json j;
+    wcx_json_begin(&j, a);
+    wcx_json_add_str(&j, "type", level == '2' ? "initfc2" : "initfc1");
+    wcx_json_add_str(&j, "short_label", wcx_arena_printf(a, "IFC%c%s", level, times));
+    if (count > 1u) {
+        wcx_json_add_u64(&j, "count", count);
+    }
+    wcx_json_add_u64(&j, "vc", vc);
+    wcx_json_add_u64(&j, "p_hdr_fc", hdr[0]);
+    wcx_json_add_u64(&j, "p_data_fc", data[0]);
+    wcx_json_add_u64(&j, "np_hdr_fc", hdr[1]);
+    wcx_json_add_u64(&j, "np_data_fc", data[1]);
+    wcx_json_add_u64(&j, "cpl_hdr_fc", hdr[2]);
+    wcx_json_add_u64(&j, "cpl_data_fc", data[2]);
+    wcx_json_add_str(&j, "crc",
+                     wcx_arena_printf(a, "0x%02X%02X,0x%02X%02X,0x%02X%02X",
+                                      (unsigned)by_slot[0][4], (unsigned)by_slot[0][5],
+                                      (unsigned)by_slot[1][4], (unsigned)by_slot[1][5],
+                                      (unsigned)by_slot[2][4], (unsigned)by_slot[2][5]));
+    pcie_sink_emit(fe->sink, start_fs, end_fs,
+                   wcx_arena_printf(a, "InitFC%c%s VC%u P H=%u D=%u, NP H=%u D=%u, Cpl H=%u D=%u",
+                                    level, times, vc, hdr[0], data[0], hdr[1], data[1], hdr[2],
+                                    data[2]),
+                   wcx_json_end(&j), false);
+}
+
+static void emit_run(pcie_dll_fe *fe) {
+    const unsigned n = fe->run_n;
+    fe->run_n = 0;
+    if (n == PCIE_TRIPLET_DLLP) {
+        emit_triplet(fe, fe->run_bytes, fe->run_count, fe->run_start_fs, fe->run_end_fs);
+    } else if (n == 1u) {
+        emit_single(fe, fe->run_bytes, fe->run_count, fe->run_start_fs, fe->run_end_fs);
+    }
+}
+
+// One unit (a single DLLP, n = 1, or a triplet, n = 3): it extends the run
+// when it is identical to the run's unit, else ends the run and starts one.
+static void add_unit(pcie_dll_fe *fe, const pcie_dllp_item *u, unsigned n) {
+    uint8_t bytes[PCIE_TRIPLET_DLLP * PCIE_DLLP_BYTES] = {0};
+    for (unsigned i = 0; i < n; i++) {
+        memcpy(bytes + (size_t)i * PCIE_DLLP_BYTES, u[i].b, PCIE_DLLP_BYTES);
+    }
+    const size_t len = (size_t)n * PCIE_DLLP_BYTES;
+    if (fe->run_n == n && memcmp(fe->run_bytes, bytes, len) == 0) {
+        fe->run_count++;
+        fe->run_end_fs = u[n - 1u].end_fs;
+        return;
+    }
+    emit_run(fe);
+    fe->run_n = n;
+    memcpy(fe->run_bytes, bytes, len);
+    fe->run_count = 1;
+    fe->run_start_fs = u[0].start_fs;
+    fe->run_end_fs = u[n - 1u].end_fs;
+}
+
+// The first held DLLP cannot begin a triplet: it is a single unit.
+static void release_first(pcie_dll_fe *fe) {
+    add_unit(fe, &fe->hold[0], 1u);
+    fe->held--;
+    for (unsigned i = 0; i < fe->held; i++) {
+        fe->hold[i] = fe->hold[i + 1u];
+    }
+}
+
+// A coalescing DLLP: held while it may still be part of a triplet.
+static void coalesce_dllp(pcie_dll_fe *fe, const pcie_dllp_item *it) {
+    fe->hold[fe->held++] = *it; // at most two were held
+    while (fe->held > 0) {
+        if (triplet_prefix(fe->hold, fe->held)) {
+            if (fe->held == PCIE_TRIPLET_DLLP) {
+                add_unit(fe, fe->hold, PCIE_TRIPLET_DLLP);
+                fe->held = 0;
+            }
+            return;
+        }
+        release_first(fe);
+    }
+}
+
+// The stretch ends: held DLLPs become single units, and the run is
+// emitted.
+static void end_stretch(pcie_dll_fe *fe) {
+    while (fe->held > 0) {
+        release_first(fe);
+    }
+    emit_run(fe);
+}
+
+static void on_dllp(pcie_dll_fe *fe, const pcie_event *ev) {
+    const pcie_packet *p = &ev->u.packet;
+    if (p->edb) {
+        end_stretch(fe);
+        pcie_fe_emit_dllp_edb(fe->sink, ev); // §10.2: not decoded
+        return;
+    }
+    if (p->length != DLLP_BODY) {
+        end_stretch(fe);
+        emit_dllp_length(fe, ev);
+        return;
+    }
+    const uint8_t *b = p->head;
+    uint8_t want[2];
+    if (fe->coalesce && dllp_lookup(b[0]) != NULL && dllp_crc_ok(b, want)) {
+        pcie_dllp_item it;
+        memcpy(it.b, b, PCIE_DLLP_BYTES);
+        it.start_fs = ev->start_fs;
+        it.end_fs = ev->end_fs;
+        coalesce_dllp(fe, &it);
+        return;
+    }
+    end_stretch(fe);
+    emit_single(fe, b, 1u, ev->start_fs, ev->end_fs);
 }
 
 // ── TLPs (§8.2) ────────────────────────────────────────────────────────────
@@ -387,9 +584,10 @@ void pcie_dll_fe_event(void *ctx, const pcie_event *ev) {
     switch (ev->kind) {
         case PCIE_EV_PACKET:
             if (ev->u.packet.tlp) {
+                end_stretch(fe);
                 emit_tlp(fe, ev);
             } else {
-                emit_dllp(fe, ev);
+                on_dllp(fe, ev);
             }
             return;
         case PCIE_EV_STRAY_RUN:
@@ -401,16 +599,21 @@ void pcie_dll_fe_event(void *ctx, const pcie_event *ev) {
         case PCIE_EV_UNKNOWN_OS:
         case PCIE_EV_FRAMING_LANE:
         case PCIE_EV_PAD_MISPLACED:
+            end_stretch(fe);
             pcie_fe_emit_error(fe->sink, ev);
             return;
         case PCIE_EV_TS:
-        case PCIE_EV_SKP:
         case PCIE_EV_FTS:
         case PCIE_EV_EIOS:
         case PCIE_EV_EIEOS:
-        case PCIE_EV_IDLE_RUN:
         case PCIE_EV_BREAK:
-        default: // §8: nothing for ordered sets or idle
+            // §8: nothing for ordered sets; §8.3: these, and a break, end a
+            // stretch of coalescing DLLPs.
+            end_stretch(fe);
+            return;
+        case PCIE_EV_SKP:
+        case PCIE_EV_IDLE_RUN:
+        default: // §8: nothing for SKP or idle, which do not end a stretch (§8.3)
             return;
     }
 }

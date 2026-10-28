@@ -35,9 +35,11 @@
 
 // §5.5: lock to `off` when this many transactions are buffered.
 #define PCIE_AUTO_LOCK_TRANSACTIONS 4096u
-// A symbol produces at most 2 transactions per pipeline (a run it ends and a
-// unit it completes); the lock check runs after every symbol, so 8 spare
-// slots mean nothing is ever dropped at the boundary.
+// A symbol produces at most 4 transactions per pipeline (the DLL decoder's
+// run and two held DLLPs that a DLLP or error ends, and that error; the PIPE
+// decoder's run it ends and a unit it completes); the lock check runs after
+// every symbol, so 8 spare slots mean nothing is ever dropped at the
+// boundary.
 #define PCIE_AUTO_BUFFER_CAP (PCIE_AUTO_LOCK_TRANSACTIONS + 8u)
 // Strings of the buffered transactions. The longest label plus fields_json
 // is under 600 bytes (a TLP with every suffix and error sentence), so two

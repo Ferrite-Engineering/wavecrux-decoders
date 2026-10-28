@@ -1,0 +1,6 @@
+[
+{"startTime":3480,"endTime":13880,"label":"UpdateFC-P ×3 VC0 H=10 D=200","isError":false,"fields":{"type":"updatefc_p","short_label":"UFC-P ×3","count":"3","vc":"0","hdr_fc":"10","data_fc":"200","crc":"0xECF8"}},
+{"startTime":7080,"endTime":7480,"label":"Disparity error D0.0","isError":true,"fields":{"type":"disparity_error","code":"0110001011","symbol":"0x00","error":"The code group is valid only for the other running disparity."}},
+{"startTime":17860,"endTime":24260,"label":"UpdateFC-P ×2 VC0 H=10 D=200","isError":false,"fields":{"type":"updatefc_p","short_label":"UFC-P ×2","count":"2","vc":"0","hdr_fc":"10","data_fc":"200","crc":"0xECF8"}},
+{"startTime":24260,"endTime":43460,"label":"InitFC1 ×2 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0","isError":false,"fields":{"type":"initfc1","short_label":"IFC1 ×2","count":"2","vc":"0","p_hdr_fc":"32","p_data_fc":"1008","np_hdr_fc":"32","np_data_fc":"1","cpl_hdr_fc":"0","cpl_data_fc":"0","crc":"0x35BC,0xB1F6,0xD892"}}
+]

@@ -19,7 +19,7 @@ static void branch_init(pcie_detector *det, unsigned i, bool descramble, bool bu
     b->sink.buf = buffered ? &b->buf : NULL;
     b->sink.buf_arena = &det->arena;
     if (det->dll) {
-        pcie_dll_fe_init(&b->fe.dll_fe, &b->sink);
+        pcie_dll_fe_init(&b->fe.dll_fe, &b->sink, coalesce);
         pcie_pipeline_init(&b->pipe, descramble, pcie_dll_fe_event, &b->fe.dll_fe);
     } else {
         pcie_pipe_fe_init(&b->fe.pipe_fe, &b->sink, coalesce, show_idle);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Ferrite Engineering LLC
 //
-// Manifest fragments shared by the PIPE decoders (pcie_plugin.c) and the
+// Manifest fragments shared by the PIPE and DLL decoders (pcie_plugin.c) and the
 // serial line decoders (pcie_serial_plugin.c), so the same parameter reads
 // the same in both.
 
@@ -22,6 +22,12 @@
     "\"display_name\":\"Coalesce repeated ordered sets\","                                   \
     "\"description\":\"One transaction per run of identical TS1, TS2, FTS or EIEOS ordered " \
     "sets, with a count\"}"
+
+#define MANIFEST_PARAM_COALESCE_DLLP                                                            \
+    "{\"name\":\"coalesce\",\"kind\":\"bool\",\"default\":true,"                                \
+    "\"display_name\":\"Coalesce repeated DLLPs\","                                             \
+    "\"description\":\"One transaction per run of identical DLLPs (repeated UpdateFC or Ack), " \
+    "and per run of identical InitFC1 or InitFC2 P/NP/Cpl triplets, with a count\"}"
 
 #define MANIFEST_PARAM_SHOW_IDLE                                   \
     "{\"name\":\"show_idle\",\"kind\":\"bool\",\"default\":false," \

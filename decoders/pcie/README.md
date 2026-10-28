@@ -99,7 +99,7 @@ $dumpvars(0, tb.dut.phy.RxDataK);
 |---|---|---|---|---|
 | `scrambling` | `auto` (Detect), `on` (On, descramble), `off` | `auto` | both | `auto` runs a descrambled and a plain decode side by side and locks to the one that first closes a packet with a correct CRC (or to `off` when a TS1/TS2 carries Disable Scrambling); it emits a `Scrambling: …` notice saying which. Until the lock nothing is shown; if no packet ever verifies it locks to `off` after 4096 buffered transactions or at the end of the trace |
 | `sample_point` | `before_edge`, `at_edge` | `before_edge` | both | `before_edge` reads the values a flip-flop captures in a zero-delay RTL dump (data changing on the same timestamp as the clock); `at_edge` reads the values present at the edge |
-| `coalesce` | bool | `true` | PIPE | One transaction per run of identical TS1, TS2, FTS or EIEOS ordered sets, with a `count` (`TS1 ×1024 …`) |
+| `coalesce` | bool | `true` | both | PIPE: one transaction per run of identical TS1, TS2, FTS or EIEOS ordered sets, with a `count` (`TS1 ×1024 …`). DLL: one per run of identical DLLPs (`UpdateFC-P ×5 …`, `Ack ×3 seq=12`) and per run of identical InitFC1 or InitFC2 P/NP/Cpl triplets (`InitFC1 ×4 VC0 …`) |
 | `show_idle` | bool | `false` | PIPE | One transaction per run of logical idle symbols |
 | `max_skew` | 0 to 64 | `8` | both | Multi-lane links: how many symbols apart the lanes' copies of one ordered set may be and still line up |
 | `lane_order` | `auto`, `physical` | `auto` | both | Multi-lane links: `auto` takes the logical lane order from the TS1/TS2 Lane#, so a reversed link decodes |
@@ -117,7 +117,13 @@ field, and never stop the decode: it resynchronises at the next symbol.
 - **Frames** (PIPE): `TLP frame seq=5 (24 symbols)`, `DLLP frame (6 symbols)`.
 - **DLLPs** (DLL): `Ack seq=12`, `Nak seq=5`, `InitFC1-P VC0 H=32 D=1008`,
   `UpdateFC-P VC0 H=10 D=200`, `PM_Enter_L1`, `Vendor 0x123456`, with the
-  wire CRC and, on a mismatch, `CRC mismatch` and the expected value.
+  wire CRC and, on a mismatch, `CRC mismatch` and the expected value. With
+  `coalesce` on (the default), repeated DLLPs are one transaction with a
+  `count`: `UpdateFC-P ×5 VC0 H=10 D=200`, and flow-control initialisation,
+  which repeats InitFC1 and then InitFC2 for P, NP and Cpl, shows as
+  `InitFC1 ×4 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0`. SKP ordered
+  sets and idle between them do not split a run; anything else the decoder
+  reports, training ordered sets and gating do (`SPEC.md` §8.3).
 - **TLPs** (DLL): `TLP seq=5 MWr32 len=1`, `Nullified TLP seq=5 MWr32`, with
   `LCRC mismatch`, `length mismatch`, `(replay)` and `sequence error` suffixes.
 - **Errors**: invalid or unexpected K symbols, truncated packets (by STP, SDP,
@@ -127,9 +133,10 @@ field, and never stop the decode: it resynchronises at the next symbol.
 
 A Gen1 DLLP lasts only a few nanoseconds, so its box is often too narrow for
 its label. DLLPs and frames also carry a `short_label` (`SPEC.md` §9.1):
-`Ack 12`, `UFC-NP`, `IFC1-P`, `PM L1`, `DLLP`, `TLP`. From WaveCrux 1.2 the
-lane draws it when the label does not fit and shows the full label when you
-rest the mouse on the box; older releases list it as an extra field.
+`Ack 12`, `UFC-NP`, `IFC1-P`, `PM L1`, `UFC-P ×5`, `IFC1 ×4`, `DLLP`, `TLP`.
+From WaveCrux 1.2 the lane draws it when the label does not fit and shows
+the full label when you rest the mouse on the box; older releases list it as
+an extra field. Zoomed out, coalescing keeps a run of DLLPs to one box.
 
 ## Multi-lane links
 
@@ -177,7 +184,8 @@ shows. The contract is [`SPEC.md`](SPEC.md) §11.
 | `rate` | `auto` (Detect), `gen1` (2.5 GT/s), `gen2` (5.0 GT/s) | `auto` | `auto` decides per burst: a run of bits shorter than 300 ps means Gen2; otherwise Gen1 after 40 runs. A speed change goes through electrical idle, so each burst is decided again |
 | `invert` | bool | `false` | Invert every bit, for an inverted pair or the N side bound |
 | `scrambling` | as above | `auto` | as above |
-| `coalesce`, `show_idle` | as above | | `pcie_serial` only |
+| `coalesce` | as above | `true` | as above, for both |
+| `show_idle` | as above | `false` | `pcie_serial` only |
 
 On top of the PIPE and DLL output they add:
 
