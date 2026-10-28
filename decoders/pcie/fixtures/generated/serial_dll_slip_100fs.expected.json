@@ -1,5 +1,5 @@
 [
-{"startTime":834000,"endTime":994000,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":834000,"endTime":994000,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","short_label":"Ack 0","seq":"0","crc":"0xB362"}},
 {"startTime":834000,"endTime":994000,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
 {"startTime":1034000,"endTime":1054000,"label":"8b/10b code error","isError":true,"fields":{"type":"code_error","code":"1011011000","error":"Not a valid 8b/10b code group."}},
 {"startTime":1034000,"endTime":1054000,"label":"EDB without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
@@ -15,5 +15,5 @@
 {"startTime":2254000,"endTime":2274000,"label":"8b/10b code error","isError":true,"fields":{"type":"code_error","code":"1011001111","error":"Not a valid 8b/10b code group."}},
 {"startTime":2262000,"endTime":2282000,"label":"Symbol lock moved by 4 bits","isError":true,"fields":{"type":"realign","shift":"4","error":"A COM arrived off the symbol boundary; symbol alignment moved to it."}},
 {"startTime":2362000,"endTime":2762000,"label":"TLP seq=1 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x225D1E5E","replay":"false"}},
-{"startTime":2762000,"endTime":2922000,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}}
+{"startTime":2762000,"endTime":2922000,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","short_label":"Ack 1","seq":"1","crc":"0x1279"}}
 ]

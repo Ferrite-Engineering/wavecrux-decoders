@@ -19,7 +19,7 @@
 {"startTime":244,"endTime":248,"label":"Idle","isError":false,"fields":{"type":"idle","symbols":"1"}},
 {"startTime":248,"endTime":280,"label":"FTS ×2","isError":false,"fields":{"type":"fts","count":"2"}},
 {"startTime":280,"endTime":284,"label":"Idle","isError":false,"fields":{"type":"idle","symbols":"1"}},
-{"startTime":284,"endTime":316,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":284,"endTime":316,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":316,"endTime":324,"label":"Idle ×2","isError":false,"fields":{"type":"idle","symbols":"2"}},
 {"startTime":324,"endTime":336,"label":"SKP ×2","isError":false,"fields":{"type":"skp","skp_symbols":"2"}}
 ]

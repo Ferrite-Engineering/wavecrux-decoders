@@ -5,15 +5,15 @@
 {"startTime":328,"endTime":520,"label":"TS2 ×3 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":456,"endTime":520,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
 {"startTime":456,"endTime":520,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
-{"startTime":528,"endTime":536,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":528,"endTime":536,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":536,"endTime":552,"label":"Packet truncated by rxvalid","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"15","error":"The packet ended without END or EDB."}},
 {"startTime":576,"endTime":584,"label":"Packet data before lane alignment","isError":false,"fields":{"type":"unaligned","symbols":"2"}},
 {"startTime":584,"endTime":600,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
 {"startTime":584,"endTime":600,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
-{"startTime":600,"endTime":608,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":600,"endTime":608,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":616,"endTime":632,"label":"X/Z on data","isError":true,"fields":{"type":"unknown_value","edges":"2","lane":"0","error":"The data or datak bus carries X or Z."}},
 {"startTime":632,"endTime":640,"label":"Packet data before lane alignment","isError":false,"fields":{"type":"unaligned","symbols":"2"}},
 {"startTime":640,"endTime":656,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
 {"startTime":640,"endTime":656,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
-{"startTime":656,"endTime":664,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+{"startTime":656,"endTime":664,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}}
 ]

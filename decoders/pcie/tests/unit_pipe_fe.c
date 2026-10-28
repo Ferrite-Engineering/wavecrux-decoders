@@ -201,12 +201,14 @@ WCX_TEST(frames) {
     FEED(&r.p, k_tlp, 1080, 10);
     WCX_REQUIRE(r.s.buf.count == 2);
     WCX_CHECK_STR_EQ(TX(r, 0).label, "DLLP frame (6 symbols)");
-    WCX_CHECK_STR_EQ(TX(r, 0).fields, "{\"type\":\"dllp_frame\",\"symbols\":6,\"end\":\"END\"}");
+    WCX_CHECK_STR_EQ(
+        TX(r, 0).fields,
+        "{\"type\":\"dllp_frame\",\"short_label\":\"DLLP\",\"symbols\":6,\"end\":\"END\"}");
     WCX_CHECK_EQ_U64(TX(r, 0).start_fs, T(0));
     WCX_CHECK_EQ_U64(TX(r, 0).end_fs, END(7));
     WCX_CHECK_STR_EQ(TX(r, 1).label, "TLP frame seq=5 (18 symbols)"); // body 00 05 ...
-    WCX_CHECK_STR_EQ(TX(r, 1).fields,
-                     "{\"type\":\"tlp_frame\",\"seq\":5,\"symbols\":18,\"end\":\"END\"}");
+    WCX_CHECK_STR_EQ(TX(r, 1).fields, "{\"type\":\"tlp_frame\",\"short_label\":\"TLP\",\"seq\":5,"
+                                      "\"symbols\":18,\"end\":\"END\"}");
     WCX_CHECK_EQ_U64(TX(r, 1).start_fs, 1080);
     WCX_CHECK_EQ_U64(TX(r, 1).end_fs, 1080 + 200);
     rig_free(&r);
@@ -227,14 +229,16 @@ WCX_TEST(frames) {
     FEED(&r.p, seq12, 1310, 10);
     WCX_REQUIRE(r.s.buf.count == 4);
     WCX_CHECK_STR_EQ(TX(r, 0).label, "TLP frame seq=5 (18 symbols, EDB)");
-    WCX_CHECK_STR_EQ(TX(r, 0).fields,
-                     "{\"type\":\"tlp_frame\",\"seq\":5,\"symbols\":18,\"end\":\"EDB\"}");
+    WCX_CHECK_STR_EQ(TX(r, 0).fields, "{\"type\":\"tlp_frame\",\"short_label\":\"TLP\",\"seq\":5,"
+                                      "\"symbols\":18,\"end\":\"EDB\"}");
     WCX_CHECK_STR_EQ(TX(r, 1).label, "DLLP ended by EDB");
     WCX_CHECK_STR_EQ(TX(r, 1).fields, "{\"type\":\"dllp_edb\",\"symbols\":6,\"error\":\"A DLLP "
                                       "cannot be ended by EDB.\"}");
     WCX_CHECK(TX(r, 1).is_error);
     WCX_CHECK_STR_EQ(TX(r, 2).label, "TLP frame (1 symbols)");
-    WCX_CHECK_STR_EQ(TX(r, 2).fields, "{\"type\":\"tlp_frame\",\"symbols\":1,\"end\":\"END\"}");
+    WCX_CHECK_STR_EQ(
+        TX(r, 2).fields,
+        "{\"type\":\"tlp_frame\",\"short_label\":\"TLP\",\"symbols\":1,\"end\":\"END\"}");
     WCX_CHECK_STR_EQ(TX(r, 3).label, "TLP frame seq=1383 (2 symbols)");
     rig_free(&r);
 }

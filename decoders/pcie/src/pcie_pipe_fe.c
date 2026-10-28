@@ -363,6 +363,7 @@ static void emit_frame(pcie_pipe_fe *fe, const pcie_event *ev) {
     wcx_json j;
     wcx_json_begin(&j, a);
     wcx_json_add_str(&j, "type", k->tlp ? "tlp_frame" : "dllp_frame");
+    wcx_json_add_str(&j, "short_label", k->tlp ? "TLP" : "DLLP"); // §9.1
     if (has_seq) {
         wcx_json_add_u64(&j, "seq", pcie_tlp_seq(k->head));
     }

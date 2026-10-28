@@ -79,60 +79,71 @@ typedef struct dllp_case {
 static const dllp_case k_cases[] = {
     {{0x00, 0x00, 0x00, 0x00, 0xB3, 0x62},
      "Ack seq=0",
-     "{\"type\":\"ack\",\"seq\":0,\"crc\":\"0xB362\"}"},
+     "{\"type\":\"ack\",\"short_label\":\"Ack 0\",\"seq\":0,\"crc\":\"0xB362\"}"},
     {{0x00, 0x00, 0x0F, 0xFF, 0x25, 0xA8},
      "Ack seq=4095",
-     "{\"type\":\"ack\",\"seq\":4095,\"crc\":\"0x25A8\"}"},
+     "{\"type\":\"ack\",\"short_label\":\"Ack 4095\",\"seq\":4095,\"crc\":\"0x25A8\"}"},
     {{0x10, 0x00, 0x00, 0x05, 0x7D, 0x70},
      "Nak seq=5",
-     "{\"type\":\"nak\",\"seq\":5,\"crc\":\"0x7D70\"}"},
+     "{\"type\":\"nak\",\"short_label\":\"Nak 5\",\"seq\":5,\"crc\":\"0x7D70\"}"},
     {{0x20, 0x00, 0x00, 0x00, 0x65, 0xAD},
      "PM_Enter_L1",
-     "{\"type\":\"pm_enter_l1\",\"crc\":\"0x65AD\"}"},
+     "{\"type\":\"pm_enter_l1\",\"short_label\":\"PM L1\",\"crc\":\"0x65AD\"}"},
     {{0x21, 0x00, 0x00, 0x00, 0x10, 0x55},
      "PM_Enter_L23",
-     "{\"type\":\"pm_enter_l23\",\"crc\":\"0x1055\"}"},
+     "{\"type\":\"pm_enter_l23\",\"short_label\":\"PM L23\",\"crc\":\"0x1055\"}"},
     {{0x23, 0x00, 0x00, 0x00, 0xEB, 0x05},
      "PM_Active_State_Request_L1",
-     "{\"type\":\"pm_as_request_l1\",\"crc\":\"0xEB05\"}"},
+     "{\"type\":\"pm_as_request_l1\",\"short_label\":\"PM ASL1\",\"crc\":\"0xEB05\"}"},
     {{0x24, 0x00, 0x00, 0x00, 0x93, 0x0C},
      "PM_Request_Ack",
-     "{\"type\":\"pm_request_ack\",\"crc\":\"0x930C\"}"},
+     "{\"type\":\"pm_request_ack\",\"short_label\":\"PM Ack\",\"crc\":\"0x930C\"}"},
     {{0x30, 0x12, 0x34, 0x56, 0x60, 0x21},
      "Vendor 0x123456",
-     "{\"type\":\"vendor\",\"payload\":\"0x123456\",\"crc\":\"0x6021\"}"},
+     "{\"type\":\"vendor\",\"short_label\":\"Vendor\",\"payload\":\"0x123456\",\"crc\":"
+     "\"0x6021\"}"},
     {{0x40, 0x08, 0x03, 0xF0, 0x35, 0xBC},
      "InitFC1-P VC0 H=32 D=1008",
-     "{\"type\":\"initfc1_p\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1008,\"crc\":\"0x35BC\"}"},
+     "{\"type\":\"initfc1_p\",\"short_label\":\"IFC1-P\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1008,"
+     "\"crc\":\"0x35BC\"}"},
     {{0x50, 0x08, 0x00, 0x01, 0xB1, 0xF6},
      "InitFC1-NP VC0 H=32 D=1",
-     "{\"type\":\"initfc1_np\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1,\"crc\":\"0xB1F6\"}"},
+     "{\"type\":\"initfc1_np\",\"short_label\":\"IFC1-NP\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1,"
+     "\"crc\":\"0xB1F6\"}"},
     {{0x60, 0x00, 0x00, 0x00, 0xD8, 0x92},
      "InitFC1-Cpl VC0 H=0 D=0",
-     "{\"type\":\"initfc1_cpl\",\"vc\":0,\"hdr_fc\":0,\"data_fc\":0,\"crc\":\"0xD892\"}"},
+     "{\"type\":\"initfc1_cpl\",\"short_label\":\"IFC1-Cpl\",\"vc\":0,\"hdr_fc\":0,\"data_fc\":0,"
+     "\"crc\":\"0xD892\"}"},
     {{0xC0, 0x08, 0x03, 0xF0, 0x4F, 0xC3},
      "InitFC2-P VC0 H=32 D=1008",
-     "{\"type\":\"initfc2_p\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1008,\"crc\":\"0x4FC3\"}"},
+     "{\"type\":\"initfc2_p\",\"short_label\":\"IFC2-P\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1008,"
+     "\"crc\":\"0x4FC3\"}"},
     {{0xD0, 0x08, 0x00, 0x01, 0xCB, 0x89},
      "InitFC2-NP VC0 H=32 D=1",
-     "{\"type\":\"initfc2_np\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1,\"crc\":\"0xCB89\"}"},
+     "{\"type\":\"initfc2_np\",\"short_label\":\"IFC2-NP\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1,"
+     "\"crc\":\"0xCB89\"}"},
     {{0xE0, 0x00, 0x00, 0x00, 0xA2, 0xED},
      "InitFC2-Cpl VC0 H=0 D=0",
-     "{\"type\":\"initfc2_cpl\",\"vc\":0,\"hdr_fc\":0,\"data_fc\":0,\"crc\":\"0xA2ED\"}"},
+     "{\"type\":\"initfc2_cpl\",\"short_label\":\"IFC2-Cpl\",\"vc\":0,\"hdr_fc\":0,\"data_fc\":0,"
+     "\"crc\":\"0xA2ED\"}"},
     {{0x80, 0x02, 0x80, 0xC8, 0xEC, 0xF8},
      "UpdateFC-P VC0 H=10 D=200",
-     "{\"type\":\"updatefc_p\",\"vc\":0,\"hdr_fc\":10,\"data_fc\":200,\"crc\":\"0xECF8\"}"},
+     "{\"type\":\"updatefc_p\",\"short_label\":\"UFC-P\",\"vc\":0,\"hdr_fc\":10,\"data_fc\":200,"
+     "\"crc\":\"0xECF8\"}"},
     // b1 = FF: HdrFC[7:2] = 111111; b2 = FF: HdrFC[1:0] = 11 -> 255, DataFC[11:8] = F; b3 = FF.
     {{0x91, 0xFF, 0xFF, 0xFF, 0x0B, 0x48},
      "UpdateFC-NP VC1 H=255 D=4095",
-     "{\"type\":\"updatefc_np\",\"vc\":1,\"hdr_fc\":255,\"data_fc\":4095,\"crc\":\"0x0B48\"}"},
+     "{\"type\":\"updatefc_np\",\"short_label\":\"UFC-NP\",\"vc\":1,\"hdr_fc\":255,\"data_fc\":"
+     "4095,\"crc\":\"0x0B48\"}"},
     // b2 = 0x41: HdrFC[1:0] = 01 -> 1, DataFC[11:8] = 1 -> 256.
     {{0xA7, 0x00, 0x41, 0x00, 0x3B, 0x4A},
      "UpdateFC-Cpl VC7 H=1 D=256",
-     "{\"type\":\"updatefc_cpl\",\"vc\":7,\"hdr_fc\":1,\"data_fc\":256,\"crc\":\"0x3B4A\"}"},
+     "{\"type\":\"updatefc_cpl\",\"short_label\":\"UFC-Cpl\",\"vc\":7,\"hdr_fc\":1,\"data_fc\":256,"
+     "\"crc\":\"0x3B4A\"}"},
     {{0x43, 0x00, 0x00, 0x00, 0x80, 0xF5},
      "InitFC1-P VC3 H=0 D=0",
-     "{\"type\":\"initfc1_p\",\"vc\":3,\"hdr_fc\":0,\"data_fc\":0,\"crc\":\"0x80F5\"}"},
+     "{\"type\":\"initfc1_p\",\"short_label\":\"IFC1-P\",\"vc\":3,\"hdr_fc\":0,\"data_fc\":0,"
+     "\"crc\":\"0x80F5\"}"},
 };
 
 WCX_TEST(every_dllp_type) {
@@ -176,23 +187,24 @@ WCX_TEST(dllp_errors) {
     feed_syms(&r.p, edb, 8, 1500, 10);
     WCX_REQUIRE(r.s.buf.count == 6);
     WCX_CHECK_STR_EQ(TX(r, 0).label, "Reserved DLLP 0x01");
-    WCX_CHECK_STR_EQ(
-        TX(r, 0).fields,
-        "{\"type\":\"reserved\",\"byte0\":\"0x01\",\"crc\":\"0xC69A\",\"error\":\"This "
-        "DLLP type is reserved in PCIe Gen1 and Gen2.\"}");
+    WCX_CHECK_STR_EQ(TX(r, 0).fields, "{\"type\":\"reserved\",\"short_label\":\"Rsvd\",\"byte0\":"
+                                      "\"0x01\",\"crc\":\"0xC69A\",\"error\":\"This "
+                                      "DLLP type is reserved in PCIe Gen1 and Gen2.\"}");
     WCX_CHECK(TX(r, 0).is_error);
     WCX_CHECK_STR_EQ(TX(r, 1).label, "Reserved DLLP 0x48");
     WCX_CHECK_STR_EQ(TX(r, 2).label, "InitFC1-P VC0 H=32 D=1008 CRC mismatch");
     WCX_CHECK_STR_EQ(TX(r, 2).fields,
-                     "{\"type\":\"initfc1_p\",\"vc\":0,\"hdr_fc\":32,\"data_fc\":1008,"
+                     "{\"type\":\"initfc1_p\",\"short_label\":\"IFC1-P\",\"vc\":0,\"hdr_fc\":32,"
+                     "\"data_fc\":1008,"
                      "\"crc\":\"0x35BD\",\"expected_crc\":\"0x35BC\",\"error\":\"DLLP CRC-16 does "
                      "not match its contents.\"}");
     WCX_CHECK(TX(r, 2).is_error);
     WCX_CHECK_STR_EQ(TX(r, 3).label, "Reserved DLLP 0x01 CRC mismatch");
-    WCX_CHECK_STR_EQ(TX(r, 3).fields,
-                     "{\"type\":\"reserved\",\"byte0\":\"0x01\",\"crc\":\"0xC69B\","
-                     "\"expected_crc\":\"0xC69A\",\"error\":\"This DLLP type is reserved in PCIe "
-                     "Gen1 and Gen2. DLLP CRC-16 does not match its contents.\"}");
+    WCX_CHECK_STR_EQ(
+        TX(r, 3).fields,
+        "{\"type\":\"reserved\",\"short_label\":\"Rsvd\",\"byte0\":\"0x01\",\"crc\":\"0xC69B\","
+        "\"expected_crc\":\"0xC69A\",\"error\":\"This DLLP type is reserved in PCIe "
+        "Gen1 and Gen2. DLLP CRC-16 does not match its contents.\"}");
     WCX_CHECK_STR_EQ(TX(r, 4).label, "DLLP length 5, expected 6");
     WCX_CHECK_STR_EQ(TX(r, 4).fields, "{\"type\":\"dllp_length\",\"symbols\":5,\"error\":\"A DLLP "
                                       "is 6 symbols between SDP and END.\"}");

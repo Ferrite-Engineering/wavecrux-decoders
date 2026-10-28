@@ -1,5 +1,5 @@
 [
-{"startTime":8540,"endTime":10140,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":8540,"endTime":10140,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","short_label":"IFC1-P","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
 {"startTime":8740,"endTime":8940,"label":"Disparity error D12.3","isError":true,"fields":{"type":"disparity_error","code":"0011010011","symbol":"0x6C","error":"The code group is valid only for the other running disparity."}},
 {"startTime":10140,"endTime":15740,"label":"TLP seq=0 MWr32 len=2","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr32","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"20","lcrc":"0x4EE81421","replay":"false"}},
 {"startTime":11940,"endTime":12140,"label":"Disparity error D27.6","isError":true,"fields":{"type":"disparity_error","code":"1101100110","symbol":"0xDB","error":"The code group is valid only for the other running disparity."}},
@@ -12,6 +12,6 @@
 {"startTime":27340,"endTime":27540,"label":"END without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
 {"startTime":27940,"endTime":29540,"label":"DLLP ended by EDB","isError":true,"fields":{"type":"dllp_edb","symbols":"6","error":"A DLLP cannot be ended by EDB."}},
 {"startTime":29340,"endTime":29540,"label":"8b/10b code error","isError":true,"fields":{"type":"code_error","code":"0000011110","error":"Not a valid 8b/10b code group."}},
-{"startTime":29940,"endTime":31540,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":29940,"endTime":31540,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","short_label":"Ack 0","seq":"0","crc":"0xB362"}},
 {"startTime":31540,"endTime":35540,"label":"TLP seq=1 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0xD2D62469","replay":"false"}}
 ]

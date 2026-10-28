@@ -7,10 +7,10 @@
 {"startTime":45600,"endTime":52000,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
 {"startTime":53600,"endTime":54000,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0x03","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
 {"startTime":53600,"endTime":54000,"label":"SDP on lane 3","isError":true,"fields":{"type":"framing_lane","symbol":"0x5C","lane":"3","error":"A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 (x8 and wider)."}},
-{"startTime":53600,"endTime":54400,"label":"DLLP frame (0 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"0","end":"END"}},
+{"startTime":53600,"endTime":54400,"label":"DLLP frame (0 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"0","end":"END"}},
 {"startTime":54000,"endTime":54400,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0xBC","error":"Data outside a packet or ordered set; logical idle is 0x00."}},
 {"startTime":55200,"endTime":56800,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
 {"startTime":57600,"endTime":58000,"label":"SDP on lane 3","isError":true,"fields":{"type":"framing_lane","symbol":"0x5C","lane":"3","error":"A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 (x8 and wider)."}},
-{"startTime":57600,"endTime":58400,"label":"DLLP frame (0 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"0","end":"END"}},
+{"startTime":57600,"endTime":58400,"label":"DLLP frame (0 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"0","end":"END"}},
 {"startTime":58000,"endTime":58400,"label":"Data outside a packet","isError":true,"fields":{"type":"stray_data","symbols":"3","first":"0x17","error":"Data outside a packet or ordered set; logical idle is 0x00."}}
 ]

@@ -363,8 +363,9 @@ WCX_TEST(lock_burst_survives_a_host_that_moves_on_without_retrying) {
     WCX_CHECK_STR_EQ(got.items[0].label, "SKP");
     WCX_CHECK_STR_EQ(got.items[0].fields, "{\"type\":\"skp\",\"skp_symbols\":3}");
     WCX_CHECK_STR_EQ(got.items[1].label, "DLLP frame (6 symbols)");
-    WCX_CHECK_STR_EQ(got.items[1].fields,
-                     "{\"type\":\"dllp_frame\",\"symbols\":6,\"end\":\"END\"}");
+    WCX_CHECK_STR_EQ(
+        got.items[1].fields,
+        "{\"type\":\"dllp_frame\",\"short_label\":\"DLLP\",\"symbols\":6,\"end\":\"END\"}");
     WCX_CHECK_STR_EQ(got.items[2].label, "Scrambling: off (detected)");
     WCX_CHECK_STR_EQ(got.items[2].fields, "{\"type\":\"scrambling_detected\",\"mode\":\"off\"}");
     // And decoding carries on: the invalid K at edge 14 comes out alone.

@@ -1,17 +1,17 @@
 [
-{"startTime":134080,"endTime":137280,"label":"InitFC1-P VC0 H=32 D=256","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"256","crc":"0x4B75"}},
+{"startTime":134080,"endTime":137280,"label":"InitFC1-P VC0 H=32 D=256","isError":false,"fields":{"type":"initfc1_p","short_label":"IFC1-P","vc":"0","hdr_fc":"32","data_fc":"256","crc":"0x4B75"}},
 {"startTime":134080,"endTime":137280,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
-{"startTime":137280,"endTime":140480,"label":"InitFC1-NP VC0 H=32 D=0","isError":false,"fields":{"type":"initfc1_np","vc":"0","hdr_fc":"32","data_fc":"0","crc":"0x10ED"}},
-{"startTime":140480,"endTime":143680,"label":"InitFC1-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc1_cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xD892"}},
-{"startTime":143680,"endTime":146880,"label":"InitFC2-P VC0 H=32 D=256","isError":false,"fields":{"type":"initfc2_p","vc":"0","hdr_fc":"32","data_fc":"256","crc":"0x310A"}},
-{"startTime":146880,"endTime":150080,"label":"InitFC2-NP VC0 H=32 D=0","isError":false,"fields":{"type":"initfc2_np","vc":"0","hdr_fc":"32","data_fc":"0","crc":"0x6A92"}},
-{"startTime":150080,"endTime":153280,"label":"InitFC2-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc2_cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xA2ED"}},
+{"startTime":137280,"endTime":140480,"label":"InitFC1-NP VC0 H=32 D=0","isError":false,"fields":{"type":"initfc1_np","short_label":"IFC1-NP","vc":"0","hdr_fc":"32","data_fc":"0","crc":"0x10ED"}},
+{"startTime":140480,"endTime":143680,"label":"InitFC1-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc1_cpl","short_label":"IFC1-Cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xD892"}},
+{"startTime":143680,"endTime":146880,"label":"InitFC2-P VC0 H=32 D=256","isError":false,"fields":{"type":"initfc2_p","short_label":"IFC2-P","vc":"0","hdr_fc":"32","data_fc":"256","crc":"0x310A"}},
+{"startTime":146880,"endTime":150080,"label":"InitFC2-NP VC0 H=32 D=0","isError":false,"fields":{"type":"initfc2_np","short_label":"IFC2-NP","vc":"0","hdr_fc":"32","data_fc":"0","crc":"0x6A92"}},
+{"startTime":150080,"endTime":153280,"label":"InitFC2-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc2_cpl","short_label":"IFC2-Cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xA2ED"}},
 {"startTime":153280,"endTime":162880,"label":"TLP seq=0 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0xA3B44B24","replay":"false"}},
 {"startTime":262860,"endTime":267660,"label":"TLP seq=1 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x9D4E4ADB","replay":"false"}},
 {"startTime":267660,"endTime":271660,"label":"TLP seq=2 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"2","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0x26D92E3F","replay":"false"}},
 {"startTime":275660,"endTime":280460,"label":"TLP seq=3 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"3","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x8B6AE59E","replay":"false"}},
 {"startTime":285260,"endTime":290060,"label":"TLP seq=3 MWr32 len=1 (replay)","isError":false,"fields":{"type":"tlp","seq":"3","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x8B6AE59E","replay":"true"}},
-{"startTime":292460,"endTime":294060,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":292460,"endTime":294060,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","short_label":"Ack 0","seq":"0","crc":"0xB362"}},
 {"startTime":300460,"endTime":305260,"label":"TLP seq=4 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"4","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x90128DED","replay":"false"}},
-{"startTime":379040,"endTime":380640,"label":"UpdateFC-P VC0 H=8 D=64","isError":false,"fields":{"type":"updatefc_p","vc":"0","hdr_fc":"8","data_fc":"64","crc":"0x3428"}}
+{"startTime":379040,"endTime":380640,"label":"UpdateFC-P VC0 H=8 D=64","isError":false,"fields":{"type":"updatefc_p","short_label":"UFC-P","vc":"0","hdr_fc":"8","data_fc":"64","crc":"0x3428"}}
 ]

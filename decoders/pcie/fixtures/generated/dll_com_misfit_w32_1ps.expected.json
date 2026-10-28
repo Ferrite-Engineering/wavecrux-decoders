@@ -8,7 +8,7 @@
 {"startTime":108000,"endTime":116000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}},
 {"startTime":128000,"endTime":136000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFD","error":"COM was not followed by a recognised ordered set."}},
 {"startTime":140000,"endTime":148000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFE","error":"COM was not followed by a recognised ordered set."}},
-{"startTime":156000,"endTime":188000,"label":"Ack seq=8","isError":false,"fields":{"type":"ack","seq":"8","crc":"0xBBBF"}},
+{"startTime":156000,"endTime":188000,"label":"Ack seq=8","isError":false,"fields":{"type":"ack","short_label":"Ack 8","seq":"8","crc":"0xBBBF"}},
 {"startTime":156000,"endTime":188000,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
 {"startTime":188000,"endTime":196000,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}}
 ]

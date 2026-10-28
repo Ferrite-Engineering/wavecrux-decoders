@@ -1,7 +1,7 @@
 [
-{"startTime":524,"endTime":532,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":524,"endTime":532,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","short_label":"IFC1-P","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
 {"startTime":540,"endTime":544,"label":"Lanes not aligned (lane 2)","isError":true,"fields":{"type":"lane_skew","lane":"2","error":"The lane did not line up with the other lanes of the link."}},
 {"startTime":540,"endTime":620,"label":"Unknown ordered set (10 times)","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set.","occurrences":"10"}},
 {"startTime":540,"endTime":660,"label":"Packet data after lane alignment lost","isError":true,"fields":{"type":"unaligned","symbols":"30","error":"Packet data after lane alignment was lost is not decoded."}},
-{"startTime":684,"endTime":692,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}}
+{"startTime":684,"endTime":692,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","short_label":"Ack 0","seq":"0","crc":"0xB362"}}
 ]

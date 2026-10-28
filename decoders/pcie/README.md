@@ -125,6 +125,12 @@ field, and never stop the decode: it resynchronises at the next symbol.
   start, data outside a packet, unknown ordered sets, X/Z on the data bus,
   PHY-reported RxStatus errors.
 
+A Gen1 DLLP lasts only a few nanoseconds, so its box is often too narrow for
+its label. DLLPs and frames also carry a `short_label` (`SPEC.md` §9.1):
+`Ack 12`, `UFC-NP`, `IFC1-P`, `PM L1`, `DLLP`, `TLP`. From WaveCrux 1.2 the
+lane draws it when the label does not fit and shows the full label when you
+rest the mouse on the box; older releases list it as an extra field.
+
 ## Multi-lane links
 
 Bind lanes 1 to 15 next to lane 0: `data1`/`datak1`, `data2`/`datak2`, …,
