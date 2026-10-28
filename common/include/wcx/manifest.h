@@ -13,7 +13,9 @@
 //   * top level: a JSON object.
 //   * "signals", "optional_signals": absent/null = none, else an array of
 //     objects with a non-empty string "name", an optional integer
-//     "bit_width" (absent/null = 1) and an optional string "description".
+//     "bit_width" (absent/null = 1), an optional string "description" and
+//     an optional "auto_bind" object (ABI 1.3) whose "aliases" and
+//     "suffixes" are absent, null or arrays of non-empty strings.
 //   * "parameters": absent/null = none, else an array of objects with a
 //     non-empty string "name", a string "kind" (bool|boolean, int|integer,
 //     enum|enumeration, string), an optional "default" (any JSON value;
@@ -55,6 +57,7 @@ typedef struct wcx_manifest_signal {
     size_t name;        // string token
     uint32_t bit_width; // 1 when the manifest omits it
     bool optional;      // declared in "optional_signals"
+    size_t auto_bind;   // "auto_bind" object token, or WCX_JSON_NONE
 } wcx_manifest_signal;
 
 typedef struct wcx_manifest_param {

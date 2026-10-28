@@ -48,6 +48,25 @@ static bool nonempty_name(const wcx_jdoc *d, size_t entry, size_t *name) {
            d->toks[*name].end > d->toks[*name].start;
 }
 
+// ABI 1.3 "auto_bind" lists (_decodeNameList): absent, null, or an array of
+// non-empty strings.
+static bool name_list(const wcx_jdoc *d, size_t obj, const char *key) {
+    const size_t arr = present(d, obj, key);
+    if (arr == WCX_JSON_NONE) {
+        return true;
+    }
+    if (d->toks[arr].type != WCX_JT_ARRAY) {
+        return false;
+    }
+    size_t e = arr + 1;
+    for (uint32_t i = 0; i < d->toks[arr].size; i++, e = d->toks[e].next) {
+        if (d->toks[e].type != WCX_JT_STRING || d->toks[e].end <= d->toks[e].start) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // _decodeBindings (lines 624-659).
 static bool parse_signals(wcx_manifest *m, const char *key, bool optional, wcx_error *err) {
     const wcx_jdoc *d = &m->doc;
@@ -75,6 +94,16 @@ static bool parse_signals(wcx_manifest *m, const char *key, bool optional, wcx_e
             wcx_error_set(err, "a manifest signal \"description\" must be a string");
             return false;
         }
+        // ABI 1.3: an object whose "aliases" and "suffixes" are name lists.
+        const size_t ab = present(d, e, "auto_bind");
+        if (ab != WCX_JSON_NONE &&
+            (d->toks[ab].type != WCX_JT_OBJECT || !name_list(d, ab, "aliases") ||
+             !name_list(d, ab, "suffixes"))) {
+            wcx_error_set(err, "a manifest signal \"auto_bind\" must be an object of string "
+                               "arrays \"aliases\" and \"suffixes\"");
+            return false;
+        }
+        s.auto_bind = ab;
         const size_t w = present(d, e, "bit_width");
         int64_t width = 1;
         if (w != WCX_JSON_NONE && !wcx_jdoc_int64(d, w, &width)) {
