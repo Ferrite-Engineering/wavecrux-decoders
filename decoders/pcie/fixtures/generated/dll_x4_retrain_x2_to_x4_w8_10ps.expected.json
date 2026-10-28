@@ -1,0 +1,6 @@
+[
+{"startTime":52400,"endTime":54000,"label":"Ack seq=7","isError":false,"fields":{"type":"ack","short_label":"Ack 7","seq":"7","crc":"0xD420"}},
+{"startTime":54000,"endTime":58000,"label":"TLP seq=0 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0xC75714A1","replay":"false"}},
+{"startTime":104400,"endTime":105200,"label":"UpdateFC-P VC0 H=8 D=64","isError":false,"fields":{"type":"updatefc_p","short_label":"UFC-P","vc":"0","hdr_fc":"8","data_fc":"64","crc":"0x3428"}},
+{"startTime":105200,"endTime":107600,"label":"TLP seq=1 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x0DF751AD","replay":"false"}}
+]

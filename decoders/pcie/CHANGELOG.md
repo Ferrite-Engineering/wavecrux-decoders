@@ -21,6 +21,15 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 - The vendored ABI header is 1.3 (WaveCrux 1.2). Plugins still load in
   WaveCrux 1.0.1 and later.
 
+### Fixed
+
+- A link width decided at the end of training now grows at a later TS2 run
+  (`SPEC.md` §12.4, §12.5). Lanes outside the link were no longer watched,
+  so after a link-down and retrain from x2 to x4 the decoder stayed at x2
+  and the packets that followed decoded as truncated. Lanes outside the link
+  now still join TS1/TS2 rounds (and nothing else), and the TS2 run that
+  ends the retrain widens the link. Reported in #20.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added
