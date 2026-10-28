@@ -34,26 +34,27 @@ typedef struct dllp_kind {
     bool fc;       // 0x40-0x47 style: low 3 bits are the VC
     const char *type;
     const char *name;
+    const char *short_name; // §9.1 short_label (Ack and Nak add the sequence number)
 } dllp_kind;
 
 // PCIe Base 2.1 §3.4.1, Table 3-1 (protocol-notes.md §5).
 static const dllp_kind k_dllp_kinds[] = {
-    {0x00u, false, "ack", "Ack"},
-    {0x10u, false, "nak", "Nak"},
-    {0x20u, false, "pm_enter_l1", "PM_Enter_L1"},
-    {0x21u, false, "pm_enter_l23", "PM_Enter_L23"},
-    {0x23u, false, "pm_as_request_l1", "PM_Active_State_Request_L1"},
-    {0x24u, false, "pm_request_ack", "PM_Request_Ack"},
-    {0x30u, false, "vendor", "Vendor"},
-    {0x40u, true, "initfc1_p", "InitFC1-P"},
-    {0x50u, true, "initfc1_np", "InitFC1-NP"},
-    {0x60u, true, "initfc1_cpl", "InitFC1-Cpl"},
-    {0xC0u, true, "initfc2_p", "InitFC2-P"},
-    {0xD0u, true, "initfc2_np", "InitFC2-NP"},
-    {0xE0u, true, "initfc2_cpl", "InitFC2-Cpl"},
-    {0x80u, true, "updatefc_p", "UpdateFC-P"},
-    {0x90u, true, "updatefc_np", "UpdateFC-NP"},
-    {0xA0u, true, "updatefc_cpl", "UpdateFC-Cpl"},
+    {0x00u, false, "ack", "Ack", "Ack"},
+    {0x10u, false, "nak", "Nak", "Nak"},
+    {0x20u, false, "pm_enter_l1", "PM_Enter_L1", "PM L1"},
+    {0x21u, false, "pm_enter_l23", "PM_Enter_L23", "PM L23"},
+    {0x23u, false, "pm_as_request_l1", "PM_Active_State_Request_L1", "PM ASL1"},
+    {0x24u, false, "pm_request_ack", "PM_Request_Ack", "PM Ack"},
+    {0x30u, false, "vendor", "Vendor", "Vendor"},
+    {0x40u, true, "initfc1_p", "InitFC1-P", "IFC1-P"},
+    {0x50u, true, "initfc1_np", "InitFC1-NP", "IFC1-NP"},
+    {0x60u, true, "initfc1_cpl", "InitFC1-Cpl", "IFC1-Cpl"},
+    {0xC0u, true, "initfc2_p", "InitFC2-P", "IFC2-P"},
+    {0xD0u, true, "initfc2_np", "InitFC2-NP", "IFC2-NP"},
+    {0xE0u, true, "initfc2_cpl", "InitFC2-Cpl", "IFC2-Cpl"},
+    {0x80u, true, "updatefc_p", "UpdateFC-P", "UFC-P"},
+    {0x90u, true, "updatefc_np", "UpdateFC-NP", "UFC-NP"},
+    {0xA0u, true, "updatefc_cpl", "UpdateFC-Cpl", "UFC-Cpl"},
 };
 
 static const dllp_kind *dllp_lookup(uint8_t byte0) {
@@ -78,14 +79,22 @@ static void emit_dllp_length(pcie_dll_fe *fe, const pcie_event *ev) {
                    wcx_arena_printf(a, "DLLP length %llu, expected 6", n), wcx_json_end(&j), true);
 }
 
-// The label and the type-specific fields of one DLLP.
+// The label and the type-specific fields of one DLLP, `type` and
+// `short_label` first (§9).
 static const char *dllp_body(wcx_arena *a, wcx_json *j, const dllp_kind *k, const uint8_t *b) {
     if (k == NULL) {
         wcx_json_add_str(j, "type", "reserved");
+        wcx_json_add_str(j, "short_label", "Rsvd");
         wcx_json_add_hex(j, "byte0", b[0], 2);
         return wcx_arena_printf(a, "Reserved DLLP 0x%02X", (unsigned)b[0]);
     }
     wcx_json_add_str(j, "type", k->type);
+    if (k->byte0 == 0x00u || k->byte0 == 0x10u) {
+        const unsigned seq = ((b[2] & 0x0Fu) << 8u) | b[3];
+        wcx_json_add_str(j, "short_label", wcx_arena_printf(a, "%s %u", k->short_name, seq));
+    } else {
+        wcx_json_add_str(j, "short_label", k->short_name);
+    }
     if (k->fc) {
         // b0 = type | VC[2:0]; b1 = rsvd[7:6] HdrFC[7:2]; b2 = HdrFC[1:0] rsvd DataFC[11:8];
         // b3 = DataFC[7:0] (protocol-notes.md §5).

@@ -59,6 +59,11 @@ manual.
 - **Labels** are short enough to read in a narrow box and lead with the type:
   `TS1 L=0 N_FTS=255`, `Ack seq=12`, `UpdateFC-P H=8 D=64`. Numbers in hex
   carry `0x`; sequence numbers and credit counts are decimal.
+- **Short labels**: a unit that is often narrower on screen than its label
+  can carry a `short_label` field right after `type` (`UFC-NP` for
+  `UpdateFC-NP VC0 H=1 D=64`, `Ack 12`). WaveCrux 1.2 draws it when the label
+  does not fit, shows the full label on hover, and does not list it as a
+  field.
 - **`fields_json`** holds everything, including what the label leaves out.
   Keys are `snake_case`; the first key is always `type`. Numeric protocol
   fields are emitted as JSON numbers; values a user compares against a

@@ -5,10 +5,10 @@
 {"startTime":336,"endTime":528,"label":"TS2 ×3 link=0 lanes=0,1,2,3,4,5,6,7 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0,0,0,0,0","lanes":"0,1,2,3,4,5,6,7","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":464,"endTime":528,"label":"Lanes aligned x8 (offsets 0,0,0,0,0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"8","offsets":"0,0,0,0,0,0,0,0"}},
 {"startTime":464,"endTime":528,"label":"Link width x8 (8 bound)","isError":false,"fields":{"type":"link_width","width":"8","bound":"8","lanes":"0,1,2,3,4,5,6,7","from":"ts2"}},
-{"startTime":536,"endTime":540,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":536,"endTime":540,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":536,"endTime":540,"label":"Scrambling: on (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"on"}},
-{"startTime":540,"endTime":552,"label":"TLP frame seq=0 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"18","end":"END"}},
-{"startTime":548,"endTime":556,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":540,"endTime":552,"label":"TLP frame seq=0 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","short_label":"TLP","seq":"0","symbols":"18","end":"END"}},
+{"startTime":548,"endTime":556,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":556,"endTime":572,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3,3,3,3,3"}},
-{"startTime":576,"endTime":588,"label":"TLP frame seq=1 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"1","symbols":"22","end":"END"}}
+{"startTime":576,"endTime":588,"label":"TLP frame seq=1 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","short_label":"TLP","seq":"1","symbols":"22","end":"END"}}
 ]

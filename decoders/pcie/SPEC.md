@@ -330,6 +330,31 @@ width (`0x5C`, `0x35BC`, `0x9AE8F8C2`, `0x123456`). The host renders every
 value as a string, so the expected files (`*.expected.json`) hold strings
 (`"seq":"5"`, `"td":"false"`).
 
+### 9.1 Short labels
+
+DLLPs and the PIPE decoder's frames carry a `short_label` field right after
+`type` (decoder ABI 1.3). WaveCrux 1.2 draws it in place of the label when
+the box is too narrow for the label, shows the full label on hover, and does
+not list `short_label` among the fields; an older host lists it as a field.
+A DLLP keeps its short label when its CRC does not match (the box is drawn as
+an error).
+
+| Transaction | `short_label` |
+|---|---|
+| Ack, Nak (§8.1) | `Ack 12`, `Nak 5` (the sequence number in decimal) |
+| PM_Enter_L1, PM_Enter_L23 | `PM L1`, `PM L23` |
+| PM_Active_State_Request_L1, PM_Request_Ack | `PM ASL1`, `PM Ack` |
+| Vendor | `Vendor` |
+| InitFC1-P, -NP, -Cpl | `IFC1-P`, `IFC1-NP`, `IFC1-Cpl` |
+| InitFC2-P, -NP, -Cpl | `IFC2-P`, `IFC2-NP`, `IFC2-Cpl` |
+| UpdateFC-P, -NP, -Cpl | `UFC-P`, `UFC-NP`, `UFC-Cpl` |
+| Reserved DLLP | `Rsvd` |
+| DLLP frame (§7) | `DLLP` |
+| TLP frame (§7) | `TLP` |
+
+Nothing else carries one: TLPs, ordered sets and errors keep their label
+only.
+
 ## 10. Readings settled after the first comparison
 
 The independent generator and the decoders disagreed, or had to guess, in the

@@ -6,7 +6,7 @@
 {"startTime":45600,"endTime":52000,"label":"Lane order 3,2,1,0","isError":false,"fields":{"type":"lane_order","order":"3,2,1,0"}},
 {"startTime":45600,"endTime":52000,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
 {"startTime":45600,"endTime":52000,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"3,2,1,0","from":"ts2"}},
-{"startTime":53600,"endTime":54400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":53600,"endTime":54400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":55200,"endTime":56800,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
-{"startTime":57600,"endTime":58400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+{"startTime":57600,"endTime":58400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}}
 ]

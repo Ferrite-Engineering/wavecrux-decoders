@@ -2,12 +2,12 @@
 {"startTime":22800,"endTime":26800,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
 {"startTime":22800,"endTime":38800,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
 {"startTime":38800,"endTime":166800,"label":"TS1 ×2 link=0 lane=0 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","link":"0","lane":"0","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
-{"startTime":174800,"endTime":206800,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":174800,"endTime":206800,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":214800,"endTime":258800,"label":"Packet truncated by electrical idle","isError":true,"fields":{"type":"truncated","packet":"tlp","symbols":"10","error":"The packet ended without END or EDB."}},
 {"startTime":258800,"endTime":263800,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}},
 {"startTime":266200,"endTime":270200,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
 {"startTime":266200,"endTime":282200,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
-{"startTime":290200,"endTime":322200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":290200,"endTime":322200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":322200,"endTime":338200,"label":"Packet truncated by electrical idle","isError":true,"fields":{"type":"truncated","packet":"dllp","symbols":"3","error":"The packet ended without END or EDB."}},
 {"startTime":340200,"endTime":351200,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}},
 {"startTime":362000,"endTime":366000,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
@@ -20,7 +20,7 @@
 {"startTime":450200,"endTime":451200,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}},
 {"startTime":462000,"endTime":466000,"label":"Symbol lock (Gen1, 2.5 GT/s)","isError":false,"fields":{"type":"symbol_lock","rate":"gen1"}},
 {"startTime":462000,"endTime":478000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
-{"startTime":490000,"endTime":522000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":490000,"endTime":522000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":522000,"endTime":538000,"label":"EIOS","isError":false,"fields":{"type":"eios"}},
 {"startTime":538000,"endTime":540000,"label":"Electrical idle","isError":false,"fields":{"type":"electrical_idle"}}
 ]

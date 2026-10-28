@@ -9,6 +9,6 @@
 {"startTime":456000,"endTime":520000,"label":"Lane 3 differs: rate_id=0x06, lane 0 rate_id=0x02","isError":true,"fields":{"type":"lane_mismatch","lane":"3","expected":"rate_id=0x02","got":"rate_id=0x06","error":"The lanes of one link sent different ordered sets."}},
 {"startTime":584000,"endTime":648000,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
 {"startTime":584000,"endTime":648000,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
-{"startTime":656000,"endTime":664000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":656000,"endTime":664000,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":664000,"endTime":680000,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}}
 ]

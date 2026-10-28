@@ -577,16 +577,19 @@ class Pipeline:
             n = len(body)
             if kind == "dllp":
                 self.emit(Tx(a, e, f"DLLP frame ({n} symbols)", False,
-                             [("type", "dllp_frame"), ("symbols", n), ("end", endname)]))
+                             [("type", "dllp_frame"), ("short_label", "DLLP"), ("symbols", n),
+                              ("end", endname)]))
             else:
                 tail = "" if endname == "END" else ", EDB"
                 if n >= 2:
                     seq = ((body[0] & 0xF) << 8) | body[1]
                     self.emit(Tx(a, e, f"TLP frame seq={seq} ({n} symbols{tail})", False,
-                                 [("type", "tlp_frame"), ("seq", seq), ("symbols", n), ("end", endname)]))
+                                 [("type", "tlp_frame"), ("short_label", "TLP"), ("seq", seq),
+                                  ("symbols", n), ("end", endname)]))
                 else:
                     self.emit(Tx(a, e, f"TLP frame ({n} symbols{tail})", False,
-                                 [("type", "tlp_frame"), ("symbols", n), ("end", endname)]))
+                                 [("type", "tlp_frame"), ("short_label", "TLP"), ("symbols", n),
+                                  ("end", endname)]))
             return
         if kind == "dllp":
             self.emit(decode_dllp(body, a, e))
@@ -693,21 +696,30 @@ def decode_dllp(body: bytes, a: int, e: int) -> Tx:
           0xA: ("UpdateFC-Cpl", "updatefc_cpl")}
     pm = {0x20: ("PM_Enter_L1", "pm_enter_l1"), 0x21: ("PM_Enter_L23", "pm_enter_l23"),
           0x23: ("PM_Active_State_Request_L1", "pm_as_request_l1"), 0x24: ("PM_Request_Ack", "pm_request_ack")}
+    # Short forms (SPEC §9.1): the flow-control name with InitFC/UpdateFC
+    # abbreviated, the PM DLLPs by their state.
+    pm_short = {0x20: "PM L1", 0x21: "PM L23", 0x23: "PM ASL1", 0x24: "PM Ack"}
     if b0 in (0x00, 0x10):
         seq = ((b2 & 0xF) << 8) | b3
-        label, typ, f = (f"{'Ack' if b0 == 0 else 'Nak'} seq={seq}", "ack" if b0 == 0 else "nak", [("seq", seq)])
+        name = "Ack" if b0 == 0 else "Nak"
+        label, typ, f = (f"{name} seq={seq}", "ack" if b0 == 0 else "nak", [("seq", seq)])
+        short = f"{name} {seq}"
     elif b0 in pm:
         label, typ, f = pm[b0][0], pm[b0][1], []
+        short = pm_short[b0]
     elif b0 == 0x30:
         p = hx(body[1:4])
         label, typ, f = f"Vendor {p}", "vendor", [("payload", p)]
+        short = "Vendor"
     elif (b0 >> 4) in fc and not b0 & 0x08:
         vc, hdr, data = b0 & 7, ((b1 & 0x3F) << 2) | (b2 >> 6), ((b2 & 0xF) << 8) | b3
         name, typ = fc[b0 >> 4]
         label, f = f"{name} VC{vc} H={hdr} D={data}", [("vc", vc), ("hdr_fc", hdr), ("data_fc", data)]
+        short = name.replace("InitFC", "IFC").replace("UpdateFC", "UFC")
     else:
         label, typ, f, err = f"Reserved DLLP {h2(b0)}", "reserved", [("byte0", h2(b0))], True
-    fields = [("type", typ)] + f + [("crc", hx(body[4:6]))]
+        short = "Rsvd"
+    fields = [("type", typ), ("short_label", short)] + f + [("crc", hx(body[4:6]))]
     if not dllp_crc_ok(body):
         label += " CRC mismatch"
         err = True

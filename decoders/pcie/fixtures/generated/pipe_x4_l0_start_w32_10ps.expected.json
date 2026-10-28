@@ -3,8 +3,8 @@
 {"startTime":6000,"endTime":7600,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
 {"startTime":6000,"endTime":7600,"label":"Link width x4 (4 bound, from SKP)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"skp"}},
 {"startTime":6000,"endTime":7600,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
-{"startTime":8400,"endTime":9200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":8400,"endTime":9200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":8400,"endTime":9200,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
-{"startTime":9200,"endTime":11200,"label":"TLP frame seq=9 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"9","symbols":"18","end":"END"}},
+{"startTime":9200,"endTime":11200,"label":"TLP frame seq=9 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","short_label":"TLP","seq":"9","symbols":"18","end":"END"}},
 {"startTime":11200,"endTime":12800,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}}
 ]

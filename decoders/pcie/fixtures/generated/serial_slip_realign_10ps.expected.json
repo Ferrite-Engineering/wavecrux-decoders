@@ -6,7 +6,7 @@
 {"startTime":17080,"endTime":17480,"label":"EDB without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
 {"startTime":17200,"endTime":17600,"label":"Symbol lock moved by 3 bits","isError":true,"fields":{"type":"realign","shift":"3","error":"A COM arrived off the symbol boundary; symbol alignment moved to it."}},
 {"startTime":17200,"endTime":18800,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
-{"startTime":20000,"endTime":23200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":20000,"endTime":23200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":24000,"endTime":24400,"label":"8b/10b code error","isError":true,"fields":{"type":"code_error","code":"1001111101","error":"Not a valid 8b/10b code group."}},
 {"startTime":24000,"endTime":24400,"label":"EDB without start","isError":true,"fields":{"type":"unmatched_end","error":"END or EDB arrived with no packet open."}},
 {"startTime":24040,"endTime":24440,"label":"Symbol lock moved by 1 bit","isError":true,"fields":{"type":"realign","shift":"1","error":"A COM arrived off the symbol boundary; symbol alignment moved to it."}},
@@ -23,6 +23,6 @@
 {"startTime":34640,"endTime":35040,"label":"8b/10b code error","isError":true,"fields":{"type":"code_error","code":"1000111110","error":"Not a valid 8b/10b code group."}},
 {"startTime":34720,"endTime":35120,"label":"Symbol lock moved by 2 bits","isError":true,"fields":{"type":"realign","shift":"2","error":"A COM arrived off the symbol boundary; symbol alignment moved to it."}},
 {"startTime":34720,"endTime":36320,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}},
-{"startTime":37120,"endTime":40320,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":37120,"endTime":40320,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":41120,"endTime":42720,"label":"EIOS","isError":false,"fields":{"type":"eios"}}
 ]

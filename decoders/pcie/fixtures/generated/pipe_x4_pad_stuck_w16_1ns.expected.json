@@ -7,7 +7,7 @@
 {"startTime":456,"endTime":520,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
 {"startTime":520,"endTime":576,"label":"Idle ×44","isError":false,"fields":{"type":"idle","symbols":"44"}},
 {"startTime":528,"endTime":576,"label":"PAD outside a packet (lane 2) (12 times)","isError":true,"fields":{"type":"pad_misplaced","lane":"2","error":"PAD outside a packet is valid only as fill after END or EDB.","occurrences":"12"}},
-{"startTime":576,"endTime":584,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":576,"endTime":584,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":584,"endTime":596,"label":"PAD outside a packet (lane 2) (3 times)","isError":true,"fields":{"type":"pad_misplaced","lane":"2","error":"PAD outside a packet is valid only as fill after END or EDB.","occurrences":"3"}},
 {"startTime":584,"endTime":608,"label":"Idle ×20","isError":false,"fields":{"type":"idle","symbols":"20"}},
 {"startTime":596,"endTime":600,"label":"PAD outside a packet (lane 1)","isError":true,"fields":{"type":"pad_misplaced","lane":"1","error":"PAD outside a packet is valid only as fill after END or EDB."}},

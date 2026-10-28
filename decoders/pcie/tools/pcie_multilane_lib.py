@@ -1231,7 +1231,8 @@ def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool, runs
         elif u.kind in ("dllp", "dllp_badlen"):
             n = len(u.info["body"])
             out.append(Tx(s, e, f"DLLP frame ({n} symbols)", False,
-                          [("type", "dllp_frame"), ("symbols", n), ("end", "END")]))
+                          [("type", "dllp_frame"), ("short_label", "DLLP"), ("symbols", n),
+                           ("end", "END")]))
         elif u.kind in ("tlp", "tlp_badlen"):
             body = u.info["body"]
             n = len(body)
@@ -1240,7 +1241,8 @@ def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool, runs
             endn = "END" if u.info["end"] == END else "EDB"
             tail = "" if endn == "END" else ", EDB"
             out.append(Tx(s, e, f"TLP frame seq={seq} ({n} symbols{tail})", False,
-                          [("type", "tlp_frame"), ("seq", seq), ("symbols", n), ("end", endn)]))
+                          [("type", "tlp_frame"), ("short_label", "TLP"), ("seq", seq),
+                           ("symbols", n), ("end", endn)]))
         elif u.kind in ("pre_com", "dropped", "partial", "pad_misplaced") or (runs and u.kind == "os_unknown"):
             pass
         else:

@@ -13,6 +13,11 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
   (`phy_tx_data_k`), and `rxvalid` to `rx_active`, `rx_valid` and names
   ending in `_rx_valid`, `_rxvalid` or `_rx_active`. Needs WaveCrux 1.2 or
   later; older releases ignore them. Requested in #4.
+- Short labels for narrow boxes (`SPEC.md` §9.1): every DLLP and every
+  PIPE `DLLP frame` and `TLP frame` carries a `short_label` field (`Ack 12`,
+  `UFC-NP`, `IFC1-P`, `PM L1`, `Rsvd`, `DLLP`, `TLP`), right after `type`.
+  WaveCrux 1.2 draws it when the label does not fit and shows the full label
+  on hover; older releases list it as a field. Requested in #5.
 - The vendored ABI header is 1.3 (WaveCrux 1.2). Plugins still load in
   WaveCrux 1.0.1 and later.
 

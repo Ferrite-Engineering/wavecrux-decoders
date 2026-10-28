@@ -28,5 +28,5 @@
 {"startTime":109600,"endTime":128800,"label":"TS2 ×3 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
 {"startTime":122400,"endTime":128800,"label":"Lane order 0,1,2,3","isError":false,"fields":{"type":"lane_order","order":"0,1,2,3"}},
 {"startTime":122400,"endTime":128800,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
-{"startTime":130400,"endTime":131200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+{"startTime":130400,"endTime":131200,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}}
 ]

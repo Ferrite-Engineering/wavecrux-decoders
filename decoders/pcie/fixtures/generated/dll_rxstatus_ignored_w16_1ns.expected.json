@@ -1,3 +1,3 @@
 [
-{"startTime":168,"endTime":200,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","seq":"1","crc":"0x1279"}}
+{"startTime":168,"endTime":200,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","short_label":"Ack 1","seq":"1","crc":"0x1279"}}
 ]

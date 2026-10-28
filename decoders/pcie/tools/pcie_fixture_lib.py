@@ -212,6 +212,16 @@ FC_KINDS = {  # kind -> (high nibble, label name)
 PM_KINDS = {"pm_enter_l1": (0x20, "PM_Enter_L1"), "pm_enter_l23": (0x21, "PM_Enter_L23"),
             "pm_as_request_l1": (0x23, "PM_Active_State_Request_L1"),
             "pm_request_ack": (0x24, "PM_Request_Ack")}
+# SPEC §9.1: the short_label of each DLLP type (Ack and Nak add the sequence
+# number).
+DLLP_SHORT = {
+    "ack": "Ack", "nak": "Nak", "pm_enter_l1": "PM L1", "pm_enter_l23": "PM L23",
+    "pm_as_request_l1": "PM ASL1", "pm_request_ack": "PM Ack", "vendor": "Vendor",
+    "initfc1_p": "IFC1-P", "initfc1_np": "IFC1-NP", "initfc1_cpl": "IFC1-Cpl",
+    "initfc2_p": "IFC2-P", "initfc2_np": "IFC2-NP", "initfc2_cpl": "IFC2-Cpl",
+    "updatefc_p": "UFC-P", "updatefc_np": "UFC-NP", "updatefc_cpl": "UFC-Cpl",
+    "reserved": "Rsvd",
+}
 
 
 @dataclass
@@ -1101,7 +1111,8 @@ def common_error_tx(u: Unit, tm: Timing) -> Tx | None:
 def dllp_tx(u: Unit, tm: Timing) -> Tx:
     d: Dllp = u.info["dllp"]
     label, typ, flds, is_err = d.describe()
-    fields = [("type", typ)] + flds + [("crc", hexb(u.info["crc"]))]
+    short = DLLP_SHORT[typ] + (f" {d.seq}" if typ in ("ack", "nak") else "")
+    fields = [("type", typ), ("short_label", short)] + flds + [("crc", hexb(u.info["crc"]))]
     if u.info["crc"] != u.info["good_crc"]:
         label += " CRC mismatch"
         is_err = True
@@ -1274,7 +1285,8 @@ def pipe_engine(st: Stream, tm: Timing, coalesce: bool, show_idle: bool) -> list
             n = len(u.info["body"])
             assert n >= 2
             out.append(Tx(s, e, f"DLLP frame ({n} symbols)", False,
-                          [("type", "dllp_frame"), ("symbols", n), ("end", "END")]))
+                          [("type", "dllp_frame"), ("short_label", "DLLP"), ("symbols", n),
+                           ("end", "END")]))
         elif u.kind in ("tlp", "tlp_badlen"):
             s, e = tm.span(u.a, u.b)
             body = u.info["body"]
@@ -1284,7 +1296,8 @@ def pipe_engine(st: Stream, tm: Timing, coalesce: bool, show_idle: bool) -> list
             endn = "END" if u.info["end"] == END else "EDB"
             tail = "" if endn == "END" else ", EDB"
             out.append(Tx(s, e, f"TLP frame seq={seq} ({n} symbols{tail})", False,
-                          [("type", "tlp_frame"), ("seq", seq), ("symbols", n), ("end", endn)]))
+                          [("type", "tlp_frame"), ("short_label", "TLP"), ("seq", seq),
+                           ("symbols", n), ("end", endn)]))
         elif u.kind in ("pre_com", "dropped", "partial"):
             pass
         else:

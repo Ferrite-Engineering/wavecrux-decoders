@@ -9,7 +9,7 @@
 {"startTime":192,"endTime":208,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}},
 {"startTime":232,"endTime":248,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFD","error":"COM was not followed by a recognised ordered set."}},
 {"startTime":256,"endTime":272,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xFE","error":"COM was not followed by a recognised ordered set."}},
-{"startTime":288,"endTime":352,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":288,"endTime":352,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}},
 {"startTime":352,"endTime":368,"label":"Unknown ordered set","isError":true,"fields":{"type":"unknown_os","symbol":"0xBC","error":"COM was not followed by a recognised ordered set."}},
 {"startTime":368,"endTime":400,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3"}}
 ]

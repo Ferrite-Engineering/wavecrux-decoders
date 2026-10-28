@@ -9,5 +9,5 @@
 {"startTime":72800,"endTime":79200,"label":"Lane order 1,0","isError":false,"fields":{"type":"lane_order","order":"1,0"}},
 {"startTime":72800,"endTime":79200,"label":"Lanes aligned x2 (offsets 0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"2","offsets":"0,0"}},
 {"startTime":72800,"endTime":79200,"label":"Link width x2 (4 bound)","isError":false,"fields":{"type":"link_width","width":"2","bound":"4","lanes":"1,0","from":"ts2"}},
-{"startTime":80800,"endTime":82400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}}
+{"startTime":80800,"endTime":82400,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","short_label":"DLLP","symbols":"6","end":"END"}}
 ]
