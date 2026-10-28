@@ -771,18 +771,20 @@ lane's key.
 
 ### 12.4 Rounds
 
-Let W = `max_skew`. The **considered lanes** are the link's lanes once the
-link is decided by a TS2 run (§12.5 rule 1), else every bound lane. Lanes
-that are not considered are ignored: their items produce nothing. A
-considered lane outside the link (while the link is decided only by SKP)
-takes part in rounds but not in rows, alignment or lane mismatch.
+Let W = `max_skew`. Every bound lane is **considered**. A lane outside the
+link takes part in rounds but not in rows, alignment or lane mismatch: its
+row symbols and gaps produce nothing. Once the link is decided by a TS2 run
+(§12.5 rule 1), a lane outside the link joins only a round whose ordered set
+is a TS1 or TS2, and only with its own TS1 or TS2; its other ordered sets
+produce nothing either. So a link trained narrower than the bound lanes still
+sees those lanes retrain.
 
 Rounds pair up the lanes' copies of one ordered set. In index order, the
 lowest-index ordered set not yet in a round (lowest lane on a tie) opens a
-round at its index c: of the considered lanes while the link is undecided,
-of the link's lanes once it is decided. The round takes, from each lane
-that opens rounds, its first ordered set not yet in a round, if its index
-is at most c + W. A considered lane outside the link joins with its first
+round at its index c: of the bound lanes while the link is undecided, of
+the link's lanes once it is decided. The round takes, from each lane that
+opens rounds, its first ordered set not yet in a round, if its index is at
+most c + W. A lane outside the link joins (as above) with its first
 ordered set not yet in a round if that one's index is within W of c,
 before or after; one more than W before c is dropped, as no round can take
 it. A lane without an ordered set in the round is **absent**.
@@ -817,8 +819,10 @@ decided, or decided again, at two kinds of round:
    (Link# and Lane# PAD) do not decide the link: the TS2 run at the end of
    Configuration does.
 
-Once decided by rule 1, only the link's lanes are considered, so the link
-can shrink at a later TS2 run but not grow.
+Once decided by rule 1, the link can shrink at a later TS2 run (fewer lanes
+with Link# and Lane# not PAD) and grow at one too: the lanes outside it still
+join rounds with their TS1 and TS2 ordered sets (§12.4), so a link-down and
+retrain to a wider width widens the link at the end of the new TS2 run.
 
 **Logical order.** With `lane_order=auto`, after rule 1, if the link's
 Lane#s in that round are exactly 0 to w-1, lane p is logical lane Lane#(p).
@@ -929,17 +933,17 @@ the round's symbols 1-15 and the `links` and `lanes` lists, nothing else.
 physical order, `-` where its ordered set in the round is not a SKP OS. The
 label is `SKP` when every count shown is 3, else `SKP ×3,3,2,3`.
 
-**Lane mismatch.** In each round, every present considered lane's ordered
-set (considered with the link as it was before this round, as for the
-reference lane) is compared with the round's: first the type (TS1, TS2, SKP, FTS, EIOS,
+**Lane mismatch.** In each round, the ordered set of every present lane of
+the link (every present lane while the link is undecided; the link as it was
+before this round, as for the reference lane) is compared with the round's: first the type (TS1, TS2, SKP, FTS, EIOS,
 EIEOS, unknown), then, for TS1/TS2, N_FTS, the Data Rate Identifier and
 Training Control. The first difference is a `lane_mismatch` error spanning
 that lane's ordered set. `expected` and `got` are the type names, or
 `n_fts=24`, `rate_id=0x02`, `training_control=0x00`. A lane whose
 difference is the same as in its previous round is not reported again.
-Link# and Lane# are never compared. Until a TS2 run decides the link, every
-bound lane is considered, so a bound lane outside the trained link that
-sends another type of ordered set (or none) is reported here.
+Link# and Lane# are never compared. Until a link is decided, every bound
+lane is compared, so a bound lane outside the trained link that sends
+another type of ordered set (or none) during training is reported here.
 
 ### 12.10 Framing on a row (w ≥ 2)
 

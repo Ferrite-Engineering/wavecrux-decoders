@@ -593,8 +593,14 @@ class LaneModel:
         return i if i < len(its) else None
 
     def considered(self) -> list[int]:
-        """§12.4: the link's lanes once rule 1 decided it, else every lane."""
-        return list(self.link) if self.rule1 else list(range(self.B))
+        """§12.4: every bound lane."""
+        return list(range(self.B))
+
+    def ignored_os(self, p: int, it: Item) -> bool:
+        """§12.4: once rule 1 decided the link, a lane outside it takes part
+        with its TS1 and TS2 ordered sets only."""
+        return (self.rule1 and self.link is not None and p not in self.link
+                and it.kind == "os" and it.os.kind not in ("ts1", "ts2"))
 
     def openers(self) -> list[int]:
         """§12.4: lanes that open rounds: the link's once decided, else the considered lanes."""
@@ -663,14 +669,15 @@ class LaneModel:
                 self.ptr[p] += 1
 
     def skip_outside(self) -> None:
-        """Considered lanes outside a SKP-decided link take part in rounds
-        only: their other items produce nothing."""
-        if self.link is None or self.rule1:
+        """Lanes outside the link take part in rounds only: their other items
+        produce nothing (§12.4)."""
+        if self.link is None:
             return
         for p in self.considered():
             if p in self.link:
                 continue
-            while self.peek(p) is not None and self.peek(p).kind != "os":
+            while self.peek(p) is not None and (self.peek(p).kind != "os"
+                                                or self.ignored_os(p, self.peek(p))):
                 self.ptr[p] += 1
 
     # main loop
@@ -746,16 +753,8 @@ class LaneModel:
         present: dict[int, Item] = {}
         idx: dict[int, int] = {}
         openers = self.openers()
-        for p in self.considered():
-            oi = self.next_os(p)
-            if p not in openers:
-                # §12.4: a considered lane outside the link joins within W of
-                # c, before or after; one more than W before c is dropped.
-                while oi is not None and self.items[p][oi].a < c - self.W:
-                    self.ptr[p] = oi + 1
-                    oi = self.next_os(p)
-            if oi is None or self.items[p][oi].a > c + self.W:
-                continue
+
+        def take(p: int, oi: int) -> None:
             while self.ptr[p] < oi:
                 it = self.items[p][self.ptr[p]]
                 if pre_link is None or p in pre_link:
@@ -767,9 +766,28 @@ class LaneModel:
                 self.ptr[p] += 1
             present[p] = self.items[p][oi]
             idx[p] = oi
+
+        for p in openers:
+            oi = self.next_os(p)
+            if oi is not None and self.items[p][oi].a <= c + self.W:
+                take(p, oi)
         link_present = [p for p in (pre_link or []) if p in present]
         refl = link_present[0] if link_present else min(present)
         ro = present[refl].os
+        # §12.4: a lane outside the link joins within W of c, before or after;
+        # one more than W before c is dropped. After a TS2 run it joins only a
+        # TS1 or TS2 round, with its own TS1 or TS2.
+        if not self.rule1 or ro.kind in ("ts1", "ts2"):
+            for p in self.considered():
+                if p in openers:
+                    continue
+                oi = self.next_os(p)
+                while oi is not None and (self.items[p][oi].a < c - self.W
+                                          or self.ignored_os(p, self.items[p][oi])):
+                    self.ptr[p] = oi + 1
+                    oi = self.next_os(p)
+                if oi is not None and self.items[p][oi].a <= c + self.W:
+                    take(p, oi)
         span = self.span_items(list(present.values()))
 
         # §12.9 lane mismatch (PIPE): considered lanes in the link before this round.

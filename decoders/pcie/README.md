@@ -143,7 +143,9 @@ The decoders deskew the lanes on their ordered sets (up to `max_skew`
 symbols), take the link width from the TS2s at the end of training (or from
 the first SKP in a trace that starts in L0), un-stripe the packets and check
 the start lane and PAD fill. A link that trains narrower than its binding
-is fine: the lanes outside it are ignored. The contract is
+is fine: the lanes outside it are ignored, except that their TS1/TS2 are
+still watched, so a later retrain to the full width widens the link. The
+contract is
 [`SPEC.md`](SPEC.md) §12. On top of the x1 output:
 
 - `Link width x2 (4 bound)` and `Lane order 3,2,1,0` (PIPE).
@@ -200,9 +202,10 @@ stops on a held level is lost. With a lot of jitter on a Gen1 line, set
 
 - The serial line decoders are x1 only. The PIPE and DLL decoders take up
   to x16 (no x32).
-- A link decided at the end of training can shrink at a later TS2 run
-  (Recovery) but not grow: lanes left outside are no longer watched. A link
-  taken from the first SKP widens at a later SKP that more lanes carry.
+- A link decided at the end of training changes at a later TS2 run: it
+  shrinks when fewer lanes carry Link# and Lane# (Recovery), and widens
+  when more do (a link-down and retrain to a wider width). A link taken from
+  the first SKP widens at a later SKP that more lanes carry.
 - Skew beyond `max_skew` is not detected as such: on back-to-back TS1/TS2 a
   lane that late can pair with the next ordered set and lose alignment at
   the first row. Raise `max_skew` for slow simulation models.

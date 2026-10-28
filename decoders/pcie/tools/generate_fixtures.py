@@ -2079,6 +2079,39 @@ def _(lk: M.Link) -> None:
     lk.idle_rows(4)
 
 
+# Trained x2 (lanes 2-3 PAD), then link down and retrained on all four lanes: the second TS2 run widens the link to x4.
+@multilane("pipe_x4_retrain_x2_to_x4_w16_1ns", "x4 bound, trained x2 then retrained x4: a later TS2 run widens the link",
+           "pipe", 2, 4, Clocking((1, "ns"), period=8), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk, order=[0, 1])
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_p", hdr=32, data=1008))
+    lk.idle_rows(2)
+    lk.skp()
+    lk.idle_rows(2)
+    M.train(lk, order=[0, 1, 2, 3], polling=1)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("initfc1_np", hdr=32, data=1))
+    lk.log.tlp(Tlp("MWr32", 0, length_dw=1, rng_seed=335))
+    lk.idle_rows(2)
+
+
+# The same retrain seen by the Data Link Layer decoder: packets on both sides of it decode.
+@multilane("dll_x4_retrain_x2_to_x4_w8_10ps", "x4 bound, trained x2 then x4: packets decode at x2, then at x4",
+           "dll", 1, 4, Clocking((10, "ps"), period=400, change="delay", delay=100), params={"scrambling": "off"})
+def _(lk: M.Link) -> None:
+    M.train(lk, order=[0, 1])
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("ack", seq=7))
+    lk.log.tlp(Tlp("MRd32", 0, rng_seed=336))
+    lk.idle_rows(2)
+    M.train(lk, order=[0, 1, 2, 3], polling=1)
+    lk.idle_rows(2)
+    lk.log.dllp(Dllp("updatefc_p", hdr=8, data=64))
+    lk.log.tlp(Tlp("MWr32", 1, length_dw=1, rng_seed=337))
+    lk.idle_rows(2)
+
+
 # 9. A lane drops out during Configuration.
 
 # Lane 3 goes idle mid-Configuration; TS2 numbers lanes 0-2: x3 is no link width, so x2 and lane 2 is cut (lane_skew).

@@ -534,14 +534,10 @@ static void apply_link(pcie_lanes *ln, uint16_t set, bool from_skp, const round_
     ln->decided = true;
     ln->width = w;
     memcpy(ln->link, order, sizeof order);
-    // §12.4: after a TS2 run only the link's lanes are considered; a link
-    // from SKP keeps every bound lane, so a later SKP can widen it.
+    // §12.4: after a TS2 run the lanes outside the link take part with
+    // their TS1/TS2 only, so a later TS2 run can widen the link again.
     if (!from_skp) {
         ln->by_ts2 = true;
-        ln->considered = 0;
-        for (unsigned i = 0; i < w; i++) {
-            ln->considered = (uint16_t)(ln->considered | (1u << order[i]));
-        }
     }
     ln->skew_reported = false;
     char lanes[LIST_CAP] = {0};
@@ -554,10 +550,6 @@ static void apply_link(pcie_lanes *ln, uint16_t set, bool from_skp, const round_
 
 // ── rounds (§12.4-§12.6, §12.9) ────────────────────────────────────────────
 
-static bool lane_considered(const pcie_lanes *ln, unsigned l) {
-    return (ln->considered & (1u << l)) != 0;
-}
-
 static bool in_link(const pcie_lanes *ln, unsigned l) {
     for (unsigned i = 0; ln->decided && i < ln->width; i++) {
         if (ln->link[i] == l) {
@@ -565,6 +557,13 @@ static bool in_link(const pcie_lanes *ln, unsigned l) {
         }
     }
     return false;
+}
+
+// §12.4: after a TS2 run (rule 1), an ordered set of a lane outside the link
+// that is not a TS1 or TS2 takes part in no round.
+static bool outside_ignored(const pcie_lanes *ln, const pcie_lane_item *it) {
+    return ln->by_ts2 && it->kind == PCIE_ITEM_OS && it->os.type != PCIE_OS_TS1 &&
+           it->os.type != PCIE_OS_TS2;
 }
 
 // §12.5 rule 1: the lane's next item after its head ordered set, skipping
@@ -867,7 +866,8 @@ static void round_link(pcie_lanes *ln, uint16_t members, unsigned ref, const rou
     }
 }
 
-// §12.9: the present considered lanes, in logical (else physical) order.
+// §12.9: the present lanes of the link (every present lane while it is
+// undecided), in logical (else physical) order.
 static void round_mismatch(pcie_lanes *ln, uint16_t members, unsigned ref) {
     const unsigned n = ln->decided ? ln->width : ln->bound;
     for (unsigned i = 0; i < n; i++) {
@@ -897,13 +897,13 @@ static void process_round(pcie_lanes *ln, uint16_t members) {
 // §12.4: forms and processes the next round once it is settled.
 // The index of the next round (§12.4): the lowest ordered set at the head of
 // a lane that opens rounds (a link lane once the link is decided, else any
-// considered lane). UINT64_MAX when there is none.
+// bound lane). UINT64_MAX when there is none.
 static uint64_t next_round_index(pcie_lanes *ln) {
     uint64_t c = UINT64_MAX;
     for (unsigned l = 0; l < ln->bound; l++) {
         const pcie_lane_item *it = head(lane_of(ln, l));
-        if (lane_considered(ln, l) && (!ln->decided || in_link(ln, l)) && it != NULL &&
-            it->kind == PCIE_ITEM_OS && it->index < c) {
+        if ((!ln->decided || in_link(ln, l)) && it != NULL && it->kind == PCIE_ITEM_OS &&
+            it->index < c) {
             c = it->index;
         }
     }
@@ -923,27 +923,34 @@ static bool try_round(pcie_lanes *ln) {
     const uint64_t first = c > ln->max_skew ? c - ln->max_skew : 0u;
     uint16_t members = 0;
     for (unsigned l = 0; l < ln->bound; l++) {
+        const pcie_lane_item *it = head(lane_of(ln, l));
+        if ((!ln->decided || in_link(ln, l)) && it != NULL && it->kind == PCIE_ITEM_OS &&
+            it->index <= last) {
+            members = (uint16_t)(members | (1u << l));
+        }
+    }
+    pcie_lane *ref = lane_of(ln, round_ref(ln, members));
+    const pcie_os_type type = front(ref)->os.type;
+    // A lane outside the link joins within W either side of c; its ordered
+    // sets more than W before c are dropped. After a TS2 run it joins only a
+    // TS1/TS2 round, and with nothing but a TS1/TS2.
+    for (unsigned l = 0; ln->decided && l < ln->bound; l++) {
         pcie_lane *lane = lane_of(ln, l);
-        if (!lane_considered(ln, l)) {
+        if (in_link(ln, l) || (ln->by_ts2 && type != PCIE_OS_TS1 && type != PCIE_OS_TS2)) {
             continue;
         }
-        const bool opener = !ln->decided || in_link(ln, l);
-        // A considered lane outside the link joins within W either side of
-        // c; its ordered sets more than W before c are dropped.
-        while (!opener && lane->count > 0 && front(lane)->kind == PCIE_ITEM_OS &&
-               front(lane)->index < first) {
+        while (lane->count > 0 && front(lane)->kind == PCIE_ITEM_OS &&
+               (front(lane)->index < first || outside_ignored(ln, front(lane)))) {
             pop(lane);
         }
         const pcie_lane_item *it = head(lane);
-        if (it != NULL && it->kind == PCIE_ITEM_OS && it->index <= last &&
-            (opener || it->index >= first)) {
+        if (it != NULL && it->kind == PCIE_ITEM_OS && it->index <= last && it->index >= first) {
             members = (uint16_t)(members | (1u << l));
         }
     }
     // §12.5 rule 1: a TS2 round waits until its reference lane shows what
     // follows the TS2 and any SKP ordered sets after it.
-    pcie_lane *ref = lane_of(ln, round_ref(ln, members));
-    if (front(ref)->os.type == PCIE_OS_TS2 && next_after_skps(ref, ln->flushing) == NEXT_PENDING) {
+    if (type == PCIE_OS_TS2 && next_after_skps(ref, ln->flushing) == NEXT_PENDING) {
         return false;
     }
     process_round(ln, members);
@@ -1047,8 +1054,8 @@ static bool ref_gap(pcie_lanes *ln, unsigned lane, pcie_lane_item *it) {
     return true;
 }
 
-// A considered lane outside the link (a link from SKP, §12.4): its row
-// symbols and gaps produce nothing, and its ordered sets wait for a round.
+// A lane outside the link (§12.4): its row symbols and gaps produce nothing,
+// and its ordered sets wait for a round, after a TS2 run only its TS1/TS2.
 // One that no round can take any more is dropped: a link lane's ordered set
 // within W after it would have settled its round by index + 2W + 17.
 static bool outside_drop(pcie_lanes *ln, unsigned l) {
@@ -1057,7 +1064,7 @@ static bool outside_drop(pcie_lanes *ln, unsigned l) {
     if (it == NULL) {
         return false;
     }
-    if (it->kind == PCIE_ITEM_OS) {
+    if (it->kind == PCIE_ITEM_OS && !outside_ignored(ln, it)) {
         const uint64_t settled =
             pcie_time_add(pcie_time_add(it->index, 2u * ln->max_skew), ROUND_SETTLE);
         if (ln->next_index <= settled) {
@@ -1069,7 +1076,7 @@ static bool outside_drop(pcie_lanes *ln, unsigned l) {
 }
 
 static bool outside_link(const pcie_lanes *ln, unsigned l) {
-    return lane_considered(ln, l) && ln->decided && !in_link(ln, l);
+    return ln->decided && !in_link(ln, l);
 }
 
 static void drain_outside_link(pcie_lanes *ln) {
@@ -1150,7 +1157,7 @@ static bool step_unaligned(pcie_lanes *ln) {
     // Other lanes first: their withheld items produce nothing.
     for (unsigned l = 0; l < ln->bound; l++) {
         pcie_lane *lane = lane_of(ln, l);
-        if (!lane_considered(ln, l) || l == ref) {
+        if (l == ref) {
             continue;
         }
         if (outside_link(ln, l)) {
@@ -1196,21 +1203,9 @@ static bool step_unaligned(pcie_lanes *ln) {
     return try_round(ln) || progress;
 }
 
-// Lanes outside the link: their items produce nothing (§12.4).
-static void drain_ignored(pcie_lanes *ln) {
-    for (unsigned l = 0; l < ln->bound; l++) {
-        if (!lane_considered(ln, l)) {
-            pcie_lane *lane = lane_of(ln, l);
-            lane->head = 0;
-            lane->count = 0;
-        }
-    }
-}
-
 static void run_lanes(pcie_lanes *ln) {
     bool progress = true;
     while (progress && !ln->failed) {
-        drain_ignored(ln);
         progress = ln->aligned ? step_aligned(ln) : step_unaligned(ln);
     }
 }
@@ -1229,7 +1224,6 @@ bool pcie_lanes_init(pcie_lanes *ln, wcx_decoder *d, pcie_detector *det, unsigne
     ln->order_auto = order_auto;
     ln->order_physical = true;
     for (unsigned l = 0; l < ln->bound && l < PCIE_MAX_LANES; l++) {
-        ln->considered = (uint16_t)(ln->considered | (1u << l));
         pcie_scrambler_reset(&lane_of(ln, l)->lfsr);
         ln->lane[l].items = calloc(PCIE_LANE_ITEMS, sizeof *ln->lane[l].items);
         if (ln->lane[l].items == NULL) {
