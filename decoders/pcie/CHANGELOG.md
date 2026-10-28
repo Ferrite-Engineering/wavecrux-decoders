@@ -6,6 +6,16 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 
 ## [Unreleased]
 
+### Added
+
+- Auto-bind names for common PIPE signal spellings (`SPEC.md` §2): `datak`
+  also binds to `data_k` and names ending in `_data_k`, `_datak` or `_k`
+  (`phy_tx_data_k`), and `rxvalid` to `rx_active`, `rx_valid` and names
+  ending in `_rx_valid`, `_rxvalid` or `_rx_active`. Needs WaveCrux 1.2 or
+  later; older releases ignore them. Requested in #4.
+- The vendored ABI header is 1.3 (WaveCrux 1.2). Plugins still load in
+  WaveCrux 1.0.1 and later.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added

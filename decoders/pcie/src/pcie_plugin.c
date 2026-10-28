@@ -93,6 +93,16 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "\"enum_values\":[\"auto\",\"physical\"],"                                                 \
     "\"enum_labels\":{\"auto\":\"From TS1/TS2 lane numbers\",\"physical\":\"Physical\"}}"
 
+// ABI 1.3 `auto_bind` (SPEC.md §2): PIPE names auto-bind should also match
+// for lane 0's datak and rxvalid. An older host ignores the key.
+#define MANIFEST_AUTO_BIND_DATAK                                                    \
+    "\"auto_bind\":{\"aliases\":[\"data_k\"],\"suffixes\":[\"_data_k\",\"_datak\"," \
+    "\"_k\"]}"
+
+#define MANIFEST_AUTO_BIND_RXVALID                                                         \
+    "\"auto_bind\":{\"aliases\":[\"rx_active\",\"rx_valid\"],\"suffixes\":[\"_rx_valid\"," \
+    "\"_rxvalid\",\"_rx_active\"]}"
+
 #define MANIFEST_SIGNALS(width, kwidth)                                                         \
     "\"signals\":["                                                                             \
     "{\"name\":\"pclk\",\"bit_width\":1,\"description\":\"PIPE parallel clock (PCLK); symbols " \
@@ -102,10 +112,11 @@ static const wcx_signal_spec k_signals_w64[SIG_COUNT] = PCIE_SIGNALS(8u);
     "the wire. One decoder instance decodes one direction\"},"                                  \
     "{\"name\":\"datak\",\"bit_width\":" kwidth                                                 \
     ",\"description\":\"PIPE TxDataK or RxDataK; bit j set marks byte lane j as a K (control) " \
-    "symbol\"}],"                                                                               \
+    "symbol\"," MANIFEST_AUTO_BIND_DATAK "}],"                                                  \
     "\"optional_signals\":["                                                                    \
     "{\"name\":\"rxvalid\",\"bit_width\":1,\"description\":\"PIPE RxValid. When bound, clock "  \
-    "edges where it is 0 carry no symbols. Unbound means always valid\"},"                      \
+    "edges where it is 0 carry no symbols. Unbound means always "                               \
+    "valid\"," MANIFEST_AUTO_BIND_RXVALID "},"                                                  \
     "{\"name\":\"txelecidle\",\"bit_width\":1,\"description\":\"PIPE TxElecIdle. When bound, "  \
     "clock edges where it is 1 carry no symbols. Unbound means never idle\"},"                  \
     "{\"name\":\"rxstatus\",\"bit_width\":3,\"description\":\"PIPE RxStatus[2:0]. The PIPE "    \

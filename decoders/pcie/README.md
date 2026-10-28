@@ -45,6 +45,12 @@ Both decoders bind the same signals, named after the PIPE pins:
 WaveCrux's auto-bind matches a decoder signal as the suffix of a waveform
 signal under a shared prefix, so `TxData`/`TxDataK` and `RxData`/`RxDataK`
 bind as the `Tx` and `Rx` groups; the prefix drop-down picks the direction.
+From WaveCrux 1.2, auto-bind also takes the other names these decoders
+declare: `datak` matches `data_k` and any name ending in `_data_k`, `_datak`
+or `_k` (`phy_tx_data_k`), and `rxvalid` matches `rx_active` and `rx_valid`
+and names ending in `_rx_valid`, `_rxvalid` or `_rx_active`. Where an ending
+matches on two buses, the one `data` bound to wins. Older WaveCrux releases
+ignore these names; bind such signals by hand there.
 
 ### openCologne-PCIE
 
@@ -54,7 +60,8 @@ decoders to the pcieVHost model's ports in `tb.bfm_pcie` or `tb.dut.bfm_pcie`:
 the top-level `downdata`/`downdatak` and `updata`/`updatak` with `tb.pclk`.
 The DLL's internal `phy_tx_data`/`phy_tx_data_k` stream (64-bit, unscrambled,
 no ordered sets) decodes with the Data Link Layer decoder too: bind `datak`
-to `phy_tx_data_k` by hand (auto-bind does not match `data_k`) and set
+to `phy_tx_data_k` (auto-bind finds it from WaveCrux 1.2; bind it by hand
+before that) and set
 `scrambling` to `off` (or leave `auto`, which locks to `off` at the first
 packet). The receive side of that stream has no K signal and cannot be
 framed; use the transmit side.
@@ -68,7 +75,8 @@ The simulation PIPE is 16 bits wide. `make run USRSIMOPTS="--define DUMP_VCD"`
 in `5.sim` dumps exactly the pins the decoders need, at the pcieVHost
 endpoint: bind the 16-bit decoders to `tb.dut.u_pcie.u_phy_top.u_pcie_ep`
 (`pclk`, `TxData`, `TxDataK` for one direction, `RxData`, `RxDataK` for the
-other), and `tb.dut.u_pcie.u_phy_top.rx_active` to `rxvalid` by hand. The
+other), and `tb.dut.u_pcie.u_phy_top.rx_active` to `rxvalid` (auto-bind finds
+it from WaveCrux 1.2; bind it by hand before that). The
 ready-made sessions `5.sim/tb.TLP-DLL-PIPE.wavecrux` and
 `5.sim/tb.PIPE-DLL.wavecrux` open that file with the decoders bound.
 
