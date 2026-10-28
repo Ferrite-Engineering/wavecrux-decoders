@@ -6,6 +6,8 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-28
+
 ### Added
 
 - Multi-lane links, x2 to x16 (`SPEC.md` §12), for the PIPE and Data Link
