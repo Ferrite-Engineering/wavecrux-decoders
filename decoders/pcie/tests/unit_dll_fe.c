@@ -22,13 +22,18 @@ typedef struct rig {
     pcie_pipeline p;
 } rig;
 
-static bool rig_init(rig *r) {
+static bool rig_init_with(rig *r, bool coalesce) {
     if (!test_sink_init(&r->s, 64)) {
         return false;
     }
-    pcie_dll_fe_init(&r->fe, &r->s.sink);
+    pcie_dll_fe_init(&r->fe, &r->s.sink, coalesce);
     pcie_pipeline_init(&r->p, false, pcie_dll_fe_event, &r->fe);
     return true;
+}
+
+// Most tests look at one DLLP at a time: coalesce=false (SPEC.md §8.3).
+static bool rig_init(rig *r) {
+    return rig_init_with(r, false);
 }
 
 static void rig_free(rig *r) {
@@ -521,6 +526,217 @@ WCX_TEST(ordered_sets_and_idle_produce_nothing) {
     rig_free(&r);
 }
 
+// ── coalescing (§8.3) ──────────────────────────────────────────────────────
+//
+// Every expected label and field below is written from SPEC.md §8.3 and
+// §9.1; the DLLP bytes and CRCs are the k_cases vectors above.
+
+#define X PCIE_TIMES
+
+static const uint8_t k_ack0[6] = {0x00, 0x00, 0x00, 0x00, 0xB3, 0x62};
+static const uint8_t k_nak5[6] = {0x10, 0x00, 0x00, 0x05, 0x7D, 0x70};
+static const uint8_t k_pm_l1[6] = {0x20, 0x00, 0x00, 0x00, 0x65, 0xAD};
+static const uint8_t k_vendor[6] = {0x30, 0x12, 0x34, 0x56, 0x60, 0x21};
+static const uint8_t k_ifc1_p[6] = {0x40, 0x08, 0x03, 0xF0, 0x35, 0xBC};
+static const uint8_t k_ifc1_np[6] = {0x50, 0x08, 0x00, 0x01, 0xB1, 0xF6};
+static const uint8_t k_ifc1_cpl[6] = {0x60, 0x00, 0x00, 0x00, 0xD8, 0x92};
+static const uint8_t k_ifc1_p_vc3[6] = {0x43, 0x00, 0x00, 0x00, 0x80, 0xF5};
+static const uint8_t k_ifc2_p[6] = {0xC0, 0x08, 0x03, 0xF0, 0x4F, 0xC3};
+static const uint8_t k_ifc2_np[6] = {0xD0, 0x08, 0x00, 0x01, 0xCB, 0x89};
+static const uint8_t k_ifc2_cpl[6] = {0xE0, 0x00, 0x00, 0x00, 0xA2, 0xED};
+static const uint8_t k_ufc_p[6] = {0x80, 0x02, 0x80, 0xC8, 0xEC, 0xF8};
+
+#define UFC_P_FIELDS                                                                             \
+    "{\"type\":\"updatefc_p\",\"short_label\":\"UFC-P\",\"vc\":0,\"hdr_fc\":10,\"data_fc\":200," \
+    "\"crc\":\"0xECF8\"}"
+
+// Feeds DLLPs 100 fs apart (each spans 80 fs: SDP..END), from `t0`.
+static void feed_dllps(rig *r, const uint8_t *const *list, size_t n, uint64_t t0) {
+    for (size_t i = 0; i < n; i++) {
+        feed_dllp(r, list[i], t0 + 100u * i);
+    }
+}
+
+WCX_TEST(identical_dllps_coalesce) {
+    rig r;
+    WCX_REQUIRE(rig_init_with(&r, true));
+    static const tsym skp_idle[] = {KS(0xBC), KS(0x1C), KS(0x1C), KS(0x1C), IDLE, IDLE};
+    feed_dllp(&r, k_ufc_p, 1000);
+    FEED(&r.p, skp_idle, 1080, 10); // a SKP OS and idle do not end the stretch
+    feed_dllp(&r, k_ufc_p, 1200);
+    feed_dllp(&r, k_ufc_p, 1300);
+    WCX_CHECK_EQ_U64(r.s.buf.count, 0); // the run is emitted when it ends
+    static const uint8_t *const rest[] = {k_ack0,  k_ack0,   k_nak5,   k_nak5,   k_pm_l1,
+                                          k_pm_l1, k_vendor, k_vendor, k_vendor, k_ack0};
+    feed_dllps(&r, rest, sizeof rest / sizeof rest[0], 1400);
+    pcie_pipeline_break(&r.p, PCIE_BREAK_FLUSH);
+    WCX_REQUIRE(r.s.buf.count == 6);
+    WCX_CHECK_STR_EQ(TX(r, 0).label, "UpdateFC-P " X "3 VC0 H=10 D=200");
+    WCX_CHECK_STR_EQ(TX(r, 0).fields, "{\"type\":\"updatefc_p\",\"short_label\":\"UFC-P " X
+                                      "3\",\"count\":3,\"vc\":0,"
+                                      "\"hdr_fc\":10,\"data_fc\":200,\"crc\":\"0xECF8\"}");
+    WCX_CHECK(!TX(r, 0).is_error);
+    WCX_CHECK_EQ_U64(TX(r, 0).start_fs, 1000); // first SDP to last END
+    WCX_CHECK_EQ_U64(TX(r, 0).end_fs, 1380);
+    WCX_CHECK_STR_EQ(TX(r, 1).label, "Ack " X "2 seq=0");
+    WCX_CHECK_STR_EQ(TX(r, 1).fields, "{\"type\":\"ack\",\"short_label\":\"Ack 0 " X
+                                      "2\",\"count\":2,\"seq\":0,\"crc\":\"0xB362\"}");
+    WCX_CHECK_EQ_U64(TX(r, 1).start_fs, 1400);
+    WCX_CHECK_EQ_U64(TX(r, 1).end_fs, 1580);
+    WCX_CHECK_STR_EQ(TX(r, 2).label, "Nak " X "2 seq=5");
+    WCX_CHECK_STR_EQ(TX(r, 2).fields, "{\"type\":\"nak\",\"short_label\":\"Nak 5 " X
+                                      "2\",\"count\":2,\"seq\":5,\"crc\":\"0x7D70\"}");
+    WCX_CHECK_STR_EQ(TX(r, 3).label, "PM_Enter_L1 " X "2");
+    WCX_CHECK_STR_EQ(TX(r, 3).fields, "{\"type\":\"pm_enter_l1\",\"short_label\":\"PM L1 " X
+                                      "2\",\"count\":2,\"crc\":\"0x65AD\"}");
+    WCX_CHECK_STR_EQ(TX(r, 4).label, "Vendor " X "3 0x123456");
+    WCX_CHECK_STR_EQ(TX(r, 4).fields,
+                     "{\"type\":\"vendor\",\"short_label\":\"Vendor " X
+                     "3\",\"count\":3,\"payload\":\"0x123456\",\"crc\":\"0x6021\"}");
+    WCX_CHECK_EQ_U64(TX(r, 4).start_fs, 2000);
+    WCX_CHECK_EQ_U64(TX(r, 4).end_fs, 2280);
+    // A run of one is the plain §8.1 transaction, without `count`.
+    WCX_CHECK_STR_EQ(TX(r, 5).label, "Ack seq=0");
+    WCX_CHECK_STR_EQ(TX(r, 5).fields,
+                     "{\"type\":\"ack\",\"short_label\":\"Ack 0\",\"seq\":0,\"crc\":\"0xB362\"}");
+    rig_free(&r);
+}
+
+WCX_TEST(initfc_triplets_coalesce_in_any_order) {
+    rig r;
+    WCX_REQUIRE(rig_init_with(&r, true));
+    // Cpl NP P twice, then Cpl NP (cut short by InitFC2), then InitFC2 P
+    // Cpl NP once and a lone InitFC2-P: the order a real Data Link Layer
+    // sent them in.
+    static const uint8_t *const seq[] = {k_ifc1_cpl, k_ifc1_np,  k_ifc1_p,   k_ifc1_cpl,
+                                         k_ifc1_np,  k_ifc1_p,   k_ifc1_cpl, k_ifc1_np,
+                                         k_ifc2_p,   k_ifc2_cpl, k_ifc2_np,  k_ifc2_p};
+    feed_dllps(&r, seq, sizeof seq / sizeof seq[0], 1000);
+    WCX_CHECK_EQ_U64(r.s.buf.count, 3); // the InitFC2 triplet and its InitFC2-P wait
+    pcie_pipeline_break(&r.p, PCIE_BREAK_FLUSH);
+    WCX_REQUIRE(r.s.buf.count == 5);
+    WCX_CHECK_STR_EQ(TX(r, 0).label, "InitFC1 " X "2 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0");
+    WCX_CHECK_STR_EQ(TX(r, 0).fields,
+                     "{\"type\":\"initfc1\",\"short_label\":\"IFC1 " X "2\",\"count\":2,\"vc\":0,"
+                     "\"p_hdr_fc\":32,\"p_data_fc\":1008,\"np_hdr_fc\":32,\"np_data_fc\":1,"
+                     "\"cpl_hdr_fc\":0,\"cpl_data_fc\":0,\"crc\":\"0x35BC,0xB1F6,0xD892\"}");
+    WCX_CHECK(!TX(r, 0).is_error);
+    WCX_CHECK_EQ_U64(TX(r, 0).start_fs, 1000);
+    WCX_CHECK_EQ_U64(TX(r, 0).end_fs, 1580);
+    WCX_CHECK_STR_EQ(TX(r, 1).label, "InitFC1-Cpl VC0 H=0 D=0");
+    WCX_CHECK_EQ_U64(TX(r, 1).start_fs, 1600);
+    WCX_CHECK_STR_EQ(TX(r, 2).label, "InitFC1-NP VC0 H=32 D=1");
+    WCX_CHECK_EQ_U64(TX(r, 2).start_fs, 1700);
+    WCX_CHECK_STR_EQ(TX(r, 3).label, "InitFC2 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0");
+    WCX_CHECK_STR_EQ(TX(r, 3).fields,
+                     "{\"type\":\"initfc2\",\"short_label\":\"IFC2\",\"vc\":0,\"p_hdr_fc\":32,"
+                     "\"p_data_fc\":1008,\"np_hdr_fc\":32,\"np_data_fc\":1,\"cpl_hdr_fc\":0,"
+                     "\"cpl_data_fc\":0,\"crc\":\"0x4FC3,0xCB89,0xA2ED\"}");
+    WCX_CHECK_EQ_U64(TX(r, 3).start_fs, 1800);
+    WCX_CHECK_EQ_U64(TX(r, 3).end_fs, 2080);
+    WCX_CHECK_STR_EQ(TX(r, 4).label, "InitFC2-P VC0 H=32 D=1008");
+    rig_free(&r);
+}
+
+WCX_TEST(triplets_are_cut_greedily_from_the_first_dllp) {
+    rig r;
+    WCX_REQUIRE(rig_init_with(&r, true));
+    // P P NP Cpl: the first P cannot pair with the second, so it is a
+    // single and the triplet starts at the second P. Then P (VC0) and P
+    // (VC3) differ in VC, P (VC3) and InitFC2-NP in level, and NP Cpl P of
+    // another order is another triplet.
+    static const uint8_t *const seq[] = {k_ifc1_p,   k_ifc1_p,     k_ifc1_np, k_ifc1_cpl,
+                                         k_ifc1_p,   k_ifc1_p_vc3, k_ifc2_np, k_ifc1_np,
+                                         k_ifc1_cpl, k_ifc1_p,     k_ack0};
+    feed_dllps(&r, seq, sizeof seq / sizeof seq[0], 1000);
+    pcie_pipeline_break(&r.p, PCIE_BREAK_FLUSH);
+    WCX_REQUIRE(r.s.buf.count == 7);
+    WCX_CHECK_STR_EQ(TX(r, 0).label, "InitFC1-P VC0 H=32 D=1008");
+    WCX_CHECK_STR_EQ(TX(r, 1).label, "InitFC1 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0");
+    WCX_CHECK_EQ_U64(TX(r, 1).start_fs, 1100);
+    WCX_CHECK_EQ_U64(TX(r, 1).end_fs, 1380);
+    WCX_CHECK_STR_EQ(TX(r, 2).label, "InitFC1-P VC0 H=32 D=1008");
+    WCX_CHECK_STR_EQ(TX(r, 3).label, "InitFC1-P VC3 H=0 D=0");
+    WCX_CHECK_STR_EQ(TX(r, 4).label, "InitFC2-NP VC0 H=32 D=1");
+    // NP Cpl P in that order: the same credits as the first triplet, but
+    // not the same three DLLPs in the same order, so not the same run.
+    WCX_CHECK_STR_EQ(TX(r, 5).label, "InitFC1 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0");
+    WCX_CHECK_EQ_U64(TX(r, 5).start_fs, 1700);
+    WCX_CHECK_STR_EQ(TX(r, 6).label, "Ack seq=0");
+    rig_free(&r);
+}
+
+WCX_TEST(what_ends_a_stretch) {
+    rig r;
+    WCX_REQUIRE(rig_init_with(&r, true));
+    static const tsym ts1[16] = {KS(0xBC), KS(0xF7), KS(0xF7), DS(24),   DS(0x02), DS(0x00),
+                                 DS(0x4A), DS(0x4A), DS(0x4A), DS(0x4A), DS(0x4A), DS(0x4A),
+                                 DS(0x4A), DS(0x4A), DS(0x4A), DS(0x4A)};
+    static const tsym fts[4] = {KS(0xBC), KS(0x3C), KS(0x3C), KS(0x3C)};
+    static const tsym eios[4] = {KS(0xBC), KS(0x7C), KS(0x7C), KS(0x7C)};
+    static const tsym eieos[16] = {KS(0xBC), KS(0xFC), KS(0xFC), KS(0xFC), KS(0xFC), KS(0xFC),
+                                   KS(0xFC), KS(0xFC), KS(0xFC), KS(0xFC), KS(0xFC), KS(0xFC),
+                                   KS(0xFC), KS(0xFC), KS(0xFC), DS(0x4A)};
+    static const tsym stray[1] = {DS(0x77)};
+    // UpdateFC-P, then each of these, then UpdateFC-P again: never one run.
+    feed_dllp(&r, k_ufc_p, 1000);
+    FEED(&r.p, ts1, 1100, 10);
+    feed_dllp(&r, k_ufc_p, 1300);
+    FEED(&r.p, fts, 1400, 10);
+    feed_dllp(&r, k_ufc_p, 1500);
+    FEED(&r.p, eios, 1600, 10);
+    feed_dllp(&r, k_ufc_p, 1700);
+    FEED(&r.p, eieos, 1800, 10);
+    feed_dllp(&r, k_ufc_p, 2000);
+    FEED(&r.p, stray, 2100, 10);
+    feed_dllp(&r, k_ufc_p, 2200);
+    pcie_pipeline_break(&r.p, PCIE_BREAK_RXVALID);
+    feed_dllp(&r, k_ufc_p, 2300);
+    feed_tlp(&r, 0, k_mrd32, sizeof k_mrd32, k_lcrc0, false, 2400);
+    feed_dllp(&r, k_ufc_p, 2700);
+    static const uint8_t bad_crc[6] = {0x80, 0x02, 0x80, 0xC8, 0xEC, 0xF9};
+    feed_dllp(&r, bad_crc, 2800); // a DLLP that does not coalesce
+    feed_dllp(&r, k_ufc_p, 2900);
+    pcie_pipeline_break(&r.p, PCIE_BREAK_FLUSH);
+    WCX_REQUIRE(r.s.buf.count == 12);
+    static const size_t ufc[] = {0, 1, 2, 3, 4, 6, 7, 9, 11};
+    for (size_t i = 0; i < sizeof ufc / sizeof ufc[0]; i++) {
+        WCX_CHECK_STR_EQ(TX(r, ufc[i]).label, "UpdateFC-P VC0 H=10 D=200");
+        WCX_CHECK_STR_EQ(TX(r, ufc[i]).fields, UFC_P_FIELDS);
+    }
+    WCX_CHECK_STR_EQ(TX(r, 5).label, "Data outside a packet");
+    WCX_CHECK_STR_EQ(TX(r, 8).label, "TLP seq=0 MRd32 len=1");
+    WCX_CHECK_STR_EQ(TX(r, 10).label, "UpdateFC-P VC0 H=10 D=200 CRC mismatch");
+    rig_free(&r);
+}
+
+WCX_TEST(an_error_ends_a_held_triplet) {
+    rig r;
+    WCX_REQUIRE(rig_init_with(&r, true));
+    // P NP held, then an END with no packet: both become singles first.
+    static const tsym end_alone[1] = {KS(0xFD)};
+    feed_dllp(&r, k_ifc1_p, 1000);
+    feed_dllp(&r, k_ifc1_np, 1100);
+    FEED(&r.p, end_alone, 1200, 10);
+    WCX_REQUIRE(r.s.buf.count == 3);
+    WCX_CHECK_STR_EQ(TX(r, 0).label, "InitFC1-P VC0 H=32 D=1008");
+    WCX_CHECK_STR_EQ(TX(r, 1).label, "InitFC1-NP VC0 H=32 D=1");
+    WCX_CHECK_STR_EQ(TX(r, 2).label, "END without start");
+    rig_free(&r);
+}
+
+WCX_TEST(coalesce_off_keeps_every_dllp) {
+    rig r;
+    WCX_REQUIRE(rig_init_with(&r, false));
+    static const uint8_t *const seq[] = {k_ufc_p, k_ufc_p, k_ifc1_p, k_ifc1_np, k_ifc1_cpl};
+    feed_dllps(&r, seq, sizeof seq / sizeof seq[0], 1000);
+    WCX_REQUIRE(r.s.buf.count == 5); // each at once, none held
+    WCX_CHECK_STR_EQ(TX(r, 0).fields, UFC_P_FIELDS);
+    WCX_CHECK_STR_EQ(TX(r, 1).fields, UFC_P_FIELDS);
+    WCX_CHECK_STR_EQ(TX(r, 4).label, "InitFC1-Cpl VC0 H=0 D=0");
+    rig_free(&r);
+}
+
 int main(void) {
     wcx_test t = WCX_TEST_INIT;
     WCX_RUN(&t, every_dllp_type);
@@ -533,5 +749,11 @@ int main(void) {
     WCX_RUN(&t, sequence_wrap_and_replay_window);
     WCX_RUN(&t, several_problems_join_their_sentences);
     WCX_RUN(&t, ordered_sets_and_idle_produce_nothing);
+    WCX_RUN(&t, identical_dllps_coalesce);
+    WCX_RUN(&t, initfc_triplets_coalesce_in_any_order);
+    WCX_RUN(&t, triplets_are_cut_greedily_from_the_first_dllp);
+    WCX_RUN(&t, what_ends_a_stretch);
+    WCX_RUN(&t, an_error_ends_a_held_triplet);
+    WCX_RUN(&t, coalesce_off_keeps_every_dllp);
     return wcx_test_finish(&t);
 }

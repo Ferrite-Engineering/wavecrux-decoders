@@ -154,9 +154,9 @@ WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
         CHECK_AUTO_BIND(&m, 2, "data_k", "_data_k,_datak,_k");
         CHECK_AUTO_BIND(&m, 3, "rx_active,rx_valid", "_rx_valid,_rxvalid,_rx_active");
         // §3 parameters: both have scrambling and sample_point (enums with
-        // labels), max_skew (int) and lane_order (enum, §12.1); only the PIPE
-        // decoder has coalesce and show_idle (bools).
-        WCX_CHECK_EQ_U64(m.param_count, k_expected[i].dll ? 4u : 6u);
+        // labels), coalesce (bool, default true; §7, §8.3), max_skew (int)
+        // and lane_order (enum, §12.1); only the PIPE decoder has show_idle.
+        WCX_CHECK_EQ_U64(m.param_count, k_expected[i].dll ? 5u : 6u);
         const size_t ms = wcx_manifest_find_param(&m, "max_skew");
         const size_t lo = wcx_manifest_find_param(&m, "lane_order");
         WCX_REQUIRE(ms != WCX_JSON_NONE && lo != WCX_JSON_NONE);
@@ -175,12 +175,13 @@ WCX_TEST(manifests_declare_the_spec_signals_and_parameters) {
         WCX_CHECK(wcx_jdoc_string_equals(&m.doc, m.params[sp].default_value, "before_edge"));
         const size_t co = wcx_manifest_find_param(&m, "coalesce");
         const size_t si = wcx_manifest_find_param(&m, "show_idle");
+        WCX_REQUIRE(co != WCX_JSON_NONE);
+        WCX_CHECK_EQ_U64(m.params[co].kind, WCX_PARAM_BOOL);
+        WCX_CHECK_EQ_U64(wcx_jdoc_type(&m.doc, m.params[co].default_value), WCX_JT_TRUE);
         if (k_expected[i].dll) {
-            WCX_CHECK(co == WCX_JSON_NONE && si == WCX_JSON_NONE);
+            WCX_CHECK(si == WCX_JSON_NONE);
         } else {
-            WCX_REQUIRE(co != WCX_JSON_NONE && si != WCX_JSON_NONE);
-            WCX_CHECK_EQ_U64(m.params[co].kind, WCX_PARAM_BOOL);
-            WCX_CHECK_EQ_U64(wcx_jdoc_type(&m.doc, m.params[co].default_value), WCX_JT_TRUE);
+            WCX_REQUIRE(si != WCX_JSON_NONE);
             WCX_CHECK_EQ_U64(wcx_jdoc_type(&m.doc, m.params[si].default_value), WCX_JT_FALSE);
         }
         wcx_manifest_free(&m);

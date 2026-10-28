@@ -20,6 +20,24 @@ All notable changes to the PCIe decoders (`wcx_pcie`). The format is
   on hover; older releases list it as a field. Requested in #5.
 - The vendored ABI header is 1.3 (WaveCrux 1.2). Plugins still load in
   WaveCrux 1.0.1 and later.
+- DLLP coalescing (`SPEC.md` §8.3): the Data Link Layer decoders
+  (`ferrite.pcie_dll_*` and `ferrite.pcie_serial_dll`) gain the `coalesce`
+  parameter, on by default as in the PIPE decoder. A run of identical DLLPs
+  (repeated UpdateFC, Ack or PM DLLPs) is one transaction with a `count`
+  (`UpdateFC-P ×5 VC0 H=10 D=200`, short label `UFC-P ×5`), and a run of
+  identical InitFC1 or InitFC2 P/NP/Cpl triplets, in any order on the wire,
+  is one too (`InitFC1 ×4 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0`,
+  short label `IFC1 ×4`). SKP ordered sets and idle do not split a run;
+  any other transaction of the decoder, a training ordered set or a break
+  does. With `coalesce` off the output is as before. Requested in #5.
+
+### Changed
+
+- With the default `coalesce=true`, the Data Link Layer decoders now show
+  repeated DLLPs and InitFC triplets as one transaction each (see Added). A
+  DLLP that may begin an InitFC triplet is held until the next DLLP shows
+  whether it does, so in `auto` scrambling the `Scrambling: … (detected)`
+  notice can come before the DLLP that locked it.
 
 ### Fixed
 

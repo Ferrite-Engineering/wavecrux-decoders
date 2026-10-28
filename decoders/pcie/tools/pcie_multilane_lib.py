@@ -28,7 +28,6 @@ derived from, the C decoders.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 
 import pcie_fixture_lib as L
 from pcie_fixture_lib import (COM, EDB, EIE, END, FTS, IDL, PAD, SDP, SKP, STP, TS1_ID, TS2_ID,
@@ -1023,6 +1022,7 @@ def build_view(lk: Link, feed: list, tm: LaneTiming, hand: dict | None = None):
         if u.kind == "dropped":
             assert breaks_at.get(u.b + 1) == "unknown", u
     V.finished = True
+    V.breaks = frozenset(breaks_at)     # SPEC §8.3: a break ends a stretch of DLLPs
     return V, vt, meta
 
 
@@ -1272,10 +1272,12 @@ def pipe_engine(V: Stream, tm: ViewTiming, coalesce: bool, show_idle: bool, runs
     return out
 
 
-def dll_engine(V: Stream, tm: ViewTiming, runs: bool) -> list[Tx]:
-    skip = ("pad_fill", "pad_misplaced") + (("os_unknown",) if runs else ())
-    units = [u for u in V.units if u.kind not in skip]
-    return L.dll_engine(SimpleNamespace(units=units), tm)
+def dll_engine(V: Stream, tm: ViewTiming, runs: bool, coalesce: bool) -> list[Tx]:
+    """pcie_fixture_lib.dll_engine on the view. PAD fill is not decoded;
+    misplaced PADs (and Unknown ordered sets when `runs`) are reported by
+    error_runs, and still end a stretch of coalescing DLLPs (SPEC §8.3)."""
+    silent = ("pad_misplaced",) + (("os_unknown",) if runs else ())
+    return L.dll_engine(V, tm, coalesce, V.breaks, silent)
 
 
 def rxstatus_txs(lay: Layout, tm: LaneTiming, lanes: list[int]) -> list[Tx]:
@@ -1313,7 +1315,7 @@ def expected(lk: Link, lay: Layout, tfs: list[int], pfs: list[int], decoder: str
 
     def run(view: str) -> list[Tx]:
         L.check_view(V, view)
-        txs = pipe_engine(V, vt, coalesce, show_idle, runs) if pipe else dll_engine(V, vt, runs)
+        txs = pipe_engine(V, vt, coalesce, show_idle, runs) if pipe else dll_engine(V, vt, runs, coalesce)
         if runs:
             txs += error_runs(V, vt, meta, pipe)
         return txs + ftx + lane_txs + model.xz + rx

@@ -59,7 +59,7 @@ static const char k_manifest_serial_dll[] =
     "8b/10b): DLLPs with CRC-16 checks, TLPs with LCRC checks, header names and sequence "
     "tracking, with 8b/10b, disparity and symbol alignment errors\","
     "\"category\":\"highSpeed\"," MANIFEST_SERIAL_SIGNALS "\"parameters\":[" MANIFEST_PARAM_RATE
-    "," MANIFEST_PARAM_INVERT "," MANIFEST_PARAM_SCRAMBLING "]}";
+    "," MANIFEST_PARAM_INVERT "," MANIFEST_PARAM_SCRAMBLING "," MANIFEST_PARAM_COALESCE_DLLP "]}";
 
 // Manifest enum order matches pcie_rate_param and pcie_scrambling_param.
 static const char *const k_rates[] = {"auto", "gen1", "gen2"};
@@ -195,8 +195,8 @@ static bool serial_init(wcx_decoder *d, void *state) {
                         &scrambling)) {
         return false;
     }
-    if (!st->dll && (!wcx_param_bool(d, "coalesce", true, &coalesce) ||
-                     !wcx_param_bool(d, "show_idle", false, &show_idle))) {
+    if (!wcx_param_bool(d, "coalesce", true, &coalesce) ||
+        (!st->dll && !wcx_param_bool(d, "show_idle", false, &show_idle))) {
         return false;
     }
     pcie_line_init(&st->line, (pcie_rate_param)rate, invert, on_line_event, st);

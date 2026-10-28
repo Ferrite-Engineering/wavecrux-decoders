@@ -72,8 +72,11 @@ WCX_TEST(off_wins_at_the_first_valid_packet) {
     ABI_STREAM(&d, k_ack);
     abi_flush(&d);
     WCX_REQUIRE(d.log.n == 3);
-    WCX_CHECK_STR_EQ(d.log.items[0].label, "InitFC1-P VC0 H=32 D=1008");
-    WCX_CHECK_STR_EQ(d.log.items[1].label, "Scrambling: off (detected)");
+    // SPEC.md §8.3: the InitFC1-P that wins the lock is held (it may begin
+    // an InitFC triplet) until the Ack shows it does not, so the notice
+    // comes first.
+    WCX_CHECK_STR_EQ(d.log.items[0].label, "Scrambling: off (detected)");
+    WCX_CHECK_STR_EQ(d.log.items[1].label, "InitFC1-P VC0 H=32 D=1008");
     WCX_CHECK_STR_EQ(d.log.items[2].label, "Ack seq=0");
     abi_close(&d);
 }
@@ -104,21 +107,23 @@ WCX_TEST(on_wins_with_a_scrambled_packet) {
     abi_drv d;
     open8(&d, t, "ferrite.pcie_dll_w8");
     ABI_STREAM(&d, scrambled); // edges 2..13
-    WCX_REQUIRE(d.log.n == 2);
-    WCX_CHECK_STR_EQ(d.log.items[0].label, "InitFC1-P VC0 H=32 D=1008");
+    // The InitFC1-P is held: it may begin an InitFC triplet (SPEC.md §8.3).
+    WCX_REQUIRE(d.log.n == 1);
+    WCX_CHECK_STR_EQ(d.log.items[0].label, "Scrambling: on (detected)");
+    WCX_CHECK_STR_EQ(d.log.items[0].fields, "{\"type\":\"scrambling_detected\",\"mode\":\"on\"}");
     WCX_CHECK_EQ_U64(d.log.items[0].start, EDGE(6));
     WCX_CHECK_EQ_U64(d.log.items[0].end, EDGE(14));
-    WCX_CHECK_STR_EQ(d.log.items[1].label, "Scrambling: on (detected)");
-    WCX_CHECK_STR_EQ(d.log.items[1].fields, "{\"type\":\"scrambling_detected\",\"mode\":\"on\"}");
-    WCX_CHECK_EQ_U64(d.log.items[1].start, EDGE(6));
-    WCX_CHECK_EQ_U64(d.log.items[1].end, EDGE(14));
     // The `off` pipeline's view (a CRC-mismatched InitFC1-NP) was discarded.
     // Scrambled idles after the lock: END took k[7], so wire 72 6E = k[8],
-    // k[9] -> idle, nothing.
+    // k[9] -> idle, nothing; idle does not end the stretch.
     static const tsym idles[2] = {DS(0x72), DS(0x6E)};
     ABI_STREAM(&d, idles);
+    WCX_CHECK_EQ_U64(d.log.n, 1);
     abi_flush(&d);
-    WCX_CHECK_EQ_U64(d.log.n, 2);
+    WCX_REQUIRE(d.log.n == 2);
+    WCX_CHECK_STR_EQ(d.log.items[1].label, "InitFC1-P VC0 H=32 D=1008");
+    WCX_CHECK_EQ_U64(d.log.items[1].start, EDGE(6));
+    WCX_CHECK_EQ_U64(d.log.items[1].end, EDGE(14));
     abi_close(&d);
     // Forced `off` on the same stream decodes the wire bytes as they are:
     // 57 C8 17 42 -> type 0x50 VC 7; HdrFC = (0xC8 & 0x3F) << 2 | 0x17 >> 6

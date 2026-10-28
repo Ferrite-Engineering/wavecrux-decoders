@@ -241,10 +241,44 @@ class Pipeline:
         self.valid_close = None     # span of a packet with good CRC just closed
         self.ds_seen = False
         self.last_sym = None
+        self.stretch: list = []     # SPEC §8.3: coalescing DLLPs not yet reported (dll)
 
     # emission helpers
     def emit(self, tx: Tx) -> None:
+        """A transaction of this pipeline: it ends a stretch of coalescing
+        DLLPs first (SPEC §8.3)."""
+        if self.stretch:
+            self.end_stretch()
         self.out.append(tx)
+
+    def emit_external(self, tx: Tx) -> None:
+        """Edge-level and line-level transactions (SPEC §4.6, §11.8) keep
+        their place but end nothing."""
+        self.out.append(tx)
+
+    def end_stretch(self) -> None:
+        """SPEC §8.3: cut the stretch into units from its first DLLP (an
+        InitFC triplet when the next three make one, else one DLLP), then
+        report each run of identical units as one transaction."""
+        st, self.stretch = self.stretch, []
+        units = []
+        i = 0
+        while i < len(st):
+            if i + 3 <= len(st) and initfc_triplet([d[0] for d in st[i:i + 3]]):
+                units.append(st[i:i + 3])
+                i += 3
+            else:
+                units.append(st[i:i + 1])
+                i += 1
+        runs: list = []
+        for u in units:
+            key = tuple(d[0] for d in u)
+            if runs and runs[-1][0] == key:
+                runs[-1][1].append(u)
+            else:
+                runs.append((key, [u]))
+        for key, us in runs:
+            self.out.append(dllp_run_tx(key, len(us), us[0][0][1], us[-1][-1][2]))
 
     def end_runs(self, keep_os_run: bool = False) -> None:
         if self.idle_run:
@@ -290,6 +324,7 @@ class Pipeline:
 
     # edge-level events
     def gate(self, reason: str) -> None:
+        self.end_stretch()          # a break (SPEC §8.3)
         self.end_xz()
         if self.state == "os":      # §10.8 item 1
             o = self.os
@@ -308,6 +343,7 @@ class Pipeline:
         self.os = []
 
     def xz_edge(self, a: int, b: int) -> None:
+        self.end_stretch()
         self.end_runs()
         if self.state == "pkt":
             self.pkt = []
@@ -506,6 +542,8 @@ class Pipeline:
                      [("type", "unknown_os"), ("symbol", h2(sym)), ("error", ERROR_TEXT["unknown_os"])]))
 
     def os_done(self) -> None:
+        if self.os_kind != "skp":
+            self.end_stretch()      # SPEC §8.3: every ordered set but SKP ends a stretch
         os = self.os
         self.state = "idle"
         a, b = os[0][2], os[-1][3]
@@ -592,7 +630,11 @@ class Pipeline:
                                   ("end", endname)]))
             return
         if kind == "dllp":
-            self.emit(decode_dllp(body, a, e))
+            tx = decode_dllp(body, a, e)
+            if self.coalesce and not tx.err:
+                self.stretch.append((body, a, e))   # SPEC §8.3: a good DLLP of a known type
+            else:
+                self.emit(tx)
         else:
             self.emit(self.decode_tlp(body, endsym, a, e))
 
@@ -664,6 +706,7 @@ class Pipeline:
                              [("type", "unknown_os"), ("symbol", h2(o[-1][0])), ("error", ERROR_TEXT["unknown_os"])]))
                 self.state = "idle"
         self.end_os_run()
+        self.end_stretch()
         if self.idle_run:
             self.end_runs_except("stray")
         if self.state == "pkt":
@@ -732,6 +775,48 @@ def decode_dllp(body: bytes, a: int, e: int) -> Tx:
     return Tx(a, e, label, err, fields)
 
 
+INITFC = {0x4: (1, "P"), 0x5: (1, "NP"), 0x6: (1, "Cpl"), 0xC: (2, "P"), 0xD: (2, "NP"), 0xE: (2, "Cpl")}
+
+
+def initfc_triplet(bodies: list) -> bool:
+    """SPEC §8.3: InitFC1-P, -NP and -Cpl (or the three InitFC2) in any
+    order, one VC."""
+    seen = []
+    for b in bodies:
+        if b[0] & 0x08 or (b[0] >> 4) not in INITFC:
+            return False
+        level, slot = INITFC[b[0] >> 4]
+        seen.append((level, b[0] & 7, slot))
+    return len({(lv, vc) for lv, vc, _ in seen}) == 1 and sorted(sl for _, _, sl in seen) == ["Cpl", "NP", "P"]
+
+
+def dllp_run_tx(key: tuple, n: int, a: int, e: int) -> Tx:
+    """One run of SPEC §8.3: `n` copies of the unit `key` (one DLLP body, or
+    a triplet's three)."""
+    times = f" ×{n}" if n > 1 else ""
+    count = [("count", n)] if n > 1 else []
+    if len(key) == 1:
+        tx = decode_dllp(key[0], a, e)
+        name, _, rest = tx.label.partition(" ")
+        label = name + times + (" " + rest if rest else "")
+        f = tx.fields
+        assert f[1][0] == "short_label"
+        fields = f[:1] + [("short_label", f[1][1] + times)] + count + f[2:]
+        return Tx(a, e, label, False, fields)
+    level = INITFC[key[0][0] >> 4][0]
+    vc = key[0][0] & 7
+    by = {INITFC[b[0] >> 4][1]: b for b in key}
+    cred = {}
+    for slot, b in by.items():
+        cred[slot] = (((b[1] & 0x3F) << 2) | (b[2] >> 6), ((b[2] & 0xF) << 8) | b[3])
+    parts = ", ".join(f"{sl} H={cred[sl][0]} D={cred[sl][1]}" for sl in ("P", "NP", "Cpl"))
+    fields = [("type", f"initfc{level}"), ("short_label", f"IFC{level}{times}")] + count + [("vc", vc)]
+    for sl in ("P", "NP", "Cpl"):
+        fields += [(f"{sl.lower()}_hdr_fc", cred[sl][0]), (f"{sl.lower()}_data_fc", cred[sl][1])]
+    fields.append(("crc", ",".join(hx(by[sl][4:6]) for sl in ("P", "NP", "Cpl"))))
+    return Tx(a, e, f"InitFC{level}{times} VC{vc} {parts}", False, fields)
+
+
 class Scrambler:
     """SPEC §5.5: the scrambling-mode lock, shared by the PIPE and serial
     paths. Owns the `off` and `on` pipelines and the buffered output."""
@@ -783,7 +868,7 @@ class Scrambler:
 
     def emit(self, tx: Tx) -> None:
         for pl in self.pipes.values():
-            pl.emit(tx)
+            pl.emit_external(tx)
         self.poll()
 
     def gate(self, reason: str) -> None:

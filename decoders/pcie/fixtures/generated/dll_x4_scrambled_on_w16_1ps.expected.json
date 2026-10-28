@@ -1,10 +1,6 @@
 [
-{"startTime":536000,"endTime":544000,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","short_label":"IFC1-P","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
-{"startTime":544000,"endTime":552000,"label":"InitFC1-NP VC0 H=32 D=1","isError":false,"fields":{"type":"initfc1_np","short_label":"IFC1-NP","vc":"0","hdr_fc":"32","data_fc":"1","crc":"0xB1F6"}},
-{"startTime":552000,"endTime":560000,"label":"InitFC1-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc1_cpl","short_label":"IFC1-Cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xD892"}},
-{"startTime":560000,"endTime":568000,"label":"InitFC2-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc2_p","short_label":"IFC2-P","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x4FC3"}},
-{"startTime":568000,"endTime":576000,"label":"InitFC2-NP VC0 H=32 D=1","isError":false,"fields":{"type":"initfc2_np","short_label":"IFC2-NP","vc":"0","hdr_fc":"32","data_fc":"1","crc":"0xCB89"}},
-{"startTime":576000,"endTime":584000,"label":"InitFC2-Cpl VC0 H=0 D=0","isError":false,"fields":{"type":"initfc2_cpl","short_label":"IFC2-Cpl","vc":"0","hdr_fc":"0","data_fc":"0","crc":"0xA2ED"}},
+{"startTime":536000,"endTime":560000,"label":"InitFC1 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0","isError":false,"fields":{"type":"initfc1","short_label":"IFC1","vc":"0","p_hdr_fc":"32","p_data_fc":"1008","np_hdr_fc":"32","np_data_fc":"1","cpl_hdr_fc":"0","cpl_data_fc":"0","crc":"0x35BC,0xB1F6,0xD892"}},
+{"startTime":560000,"endTime":584000,"label":"InitFC2 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0","isError":false,"fields":{"type":"initfc2","short_label":"IFC2","vc":"0","p_hdr_fc":"32","p_data_fc":"1008","np_hdr_fc":"32","np_data_fc":"1","cpl_hdr_fc":"0","cpl_data_fc":"0","crc":"0x4FC3,0xCB89,0xA2ED"}},
 {"startTime":584000,"endTime":612000,"label":"TLP seq=0 MWr32 len=2","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr32","length_dw":"2","tc":"0","td":"false","ep":"false","bytes":"20","lcrc":"0x2D0E3A8E","replay":"false"}},
 {"startTime":644000,"endTime":664000,"label":"TLP seq=1 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0xFA704EBC","replay":"false"}},
 {"startTime":664000,"endTime":672000,"label":"Ack seq=1","isError":false,"fields":{"type":"ack","short_label":"Ack 1","seq":"1","crc":"0x1279"}}

@@ -67,7 +67,7 @@ Two lane-0 signals declare extra names for WaveCrux's auto-bind (ABI 1.3
 |---|---|---|---|---|
 | `scrambling` | enum | `auto`, `on`, `off` | `auto` | both |
 | `sample_point` | enum | `before_edge`, `at_edge` | `before_edge` | both |
-| `coalesce` | bool | | `true` | PIPE |
+| `coalesce` | bool | | `true` | both (PIPE §7, DLL §8.3) |
 | `show_idle` | bool | | `false` | PIPE |
 | `max_skew` | int | 0 to 64 | 8 | both (§12) |
 | `lane_order` | enum | `auto`, `physical` | `auto` | both (§12) |
@@ -321,6 +321,62 @@ TLP sets `next = seq + 1 (mod 4096)`. Each later one:
 When several suffixes apply, they appear in this order: ` LCRC mismatch`, `
 length mismatch`, ` (replay)`, ` sequence error`.
 
+### 8.3 Coalescing
+
+With `coalesce=true` (the default), repeated DLLPs become one transaction.
+With `coalesce=false` every DLLP is its own transaction, exactly as in §8.1.
+
+A DLLP **coalesces** when its CRC matches and its type is not reserved.
+Other DLLPs, and the `dllp_length` and `dllp_edb` errors, are reported as in
+§8.1 and §10.2.
+
+**Stretches.** A stretch is a sequence of coalescing DLLPs with nothing
+between them that ends one. A stretch ends at:
+
+- any other transaction of the decoder's pipeline: a TLP or TLP error, a DLLP
+  that does not coalesce, a §6 or §10.2 error, `framing_lane` or
+  `pad_misplaced` (§12.10);
+- a TS1, TS2, FTS OS, EIOS or EIEOS;
+- a pipeline break: gating (§4.3), X/Z (§4.4), electrical idle (§11.3), a
+  loss of lane alignment or a common break (§12.6);
+- the end of the trace.
+
+A SKP ordered set and logical idle do not end a stretch, and neither do
+edge-level (§4.6, §12.8), line-level (§11.8) and lane-level transactions
+(`link_width`, `lane_order`, `lanes_aligned`, `lane_skew`, `lane_mismatch`,
+`unaligned`; a loss of alignment ends it as a break). PAD fill (§12.10) and
+withheld symbols (§12.7) are not decoded and do not end one either.
+
+**Units.** A stretch is cut into units from its first DLLP on: when the next
+three DLLPs are an **InitFC triplet**, they are one unit; otherwise the next
+DLLP is one. An InitFC triplet is InitFC1-P, InitFC1-NP and InitFC1-Cpl, or
+InitFC2-P, InitFC2-NP and InitFC2-Cpl, in any order, all with the same VC.
+So `P P NP Cpl` is a single InitFC1-P, then a triplet.
+
+**Runs.** Consecutive identical units form one run, reported as one
+transaction with a count N. Two singles are identical when their six bytes
+are; two triplets when their three DLLPs are, in the same order. A run spans
+its first DLLP's SDP to its last DLLP's END.
+
+| Run | Label | `type` | Fields after `type` |
+|---|---|---|---|
+| A single DLLP, N = 1 | as in §8.1 | as in §8.1 | as in §8.1 |
+| A single DLLP, N > 1 | the §8.1 label with ` ×N` after the DLLP's name: `UpdateFC-P ×5 VC0 H=10 D=200`, `Ack ×3 seq=12`, `PM_Enter_L1 ×4`, `Vendor ×2 0x123456` | as in §8.1 | `short_label` (§9.1), `count`, then as in §8.1 |
+| A triplet | `InitFC1 ×4 VC0 P H=32 D=1008, NP H=32 D=1, Cpl H=0 D=0` (` ×N` only when N > 1) | `initfc1` / `initfc2` | `short_label`, `count` (only when N > 1), `vc`, `p_hdr_fc`, `p_data_fc`, `np_hdr_fc`, `np_data_fc`, `cpl_hdr_fc`, `cpl_data_fc`, `crc` |
+
+A triplet lists P, NP and Cpl in that order, whatever their order on the
+wire; its `crc` is the three CRCs in that order, comma-separated
+(`"0x35BC,0xB1F6,0xD892"`). No run is an error: a DLLP with a problem does
+not coalesce.
+
+**When a run is emitted.** A run is emitted when it ends: when a different
+unit follows, or when the stretch ends. A DLLP that may still begin a
+triplet is held until that is known; when the stretch ends, held DLLPs
+become single units. So a run is emitted after the transactions that start
+inside it, and in `auto` scrambling the `Scrambling: … (detected)` notice
+can come before the run holding the packet that locked it. A run counts
+toward the 4096 ceiling of §5.5 when it is emitted.
+
 ## 9. Field encoding
 
 `fields_json` is a JSON object, `type` first, then the fields in the order
@@ -349,6 +405,8 @@ an error).
 | InitFC2-P, -NP, -Cpl | `IFC2-P`, `IFC2-NP`, `IFC2-Cpl` |
 | UpdateFC-P, -NP, -Cpl | `UFC-P`, `UFC-NP`, `UFC-Cpl` |
 | Reserved DLLP | `Rsvd` |
+| A run of N > 1 identical DLLPs (§8.3) | the DLLP's short label and ` ×N`: `UFC-P ×5`, `Ack 12 ×3` |
+| An InitFC triplet run (§8.3) | `IFC1` / `IFC2`, with ` ×N` when N > 1: `IFC1 ×4` |
 | DLLP frame (§7) | `DLLP` |
 | TLP frame (§7) | `TLP` |
 
@@ -445,7 +503,9 @@ At flush, in this order:
 1. A complete ordered set still being assembled is emitted: a SKP OS with at
    least one SKP, an FTS OS or EIOS with all three symbols, a TS or EIEOS
    with all 16. An incomplete one is `unknown_os`, spanning its symbols.
-2. A coalesced run in progress (TS1, TS2, FTS, EIEOS, Idle) is emitted.
+2. A coalesced run in progress (TS1, TS2, FTS, EIEOS, Idle) is emitted; in
+   the DLL decoder, the DLLPs still held and the DLLP run in progress
+   (§8.3).
 3. An open packet is a `truncated` error, label `Packet truncated by end of
    trace`, spanning start symbol to last body symbol.
 4. A stray-data or X/Z run in progress is emitted.
@@ -487,7 +547,8 @@ adopted as written:
    toward the 4096 ceiling and keep their time order.
 5. **The 4096 ceiling** is checked after each symbol, break and edge-level
    transaction; a single symbol that completes two units may take the buffer
-   to 4097 before the undetermined notice.
+   to 4097 before the undetermined notice (and further in the DLL decoder,
+   where one symbol can end a DLLP run and two held DLLPs, §8.3).
 6. **The Disable Scrambling notice** is emitted when the TS that carries the
    bit completes, before the coalesced run it belongs to.
 7. **A DLLP ended by EDB** never counts as a valid packet for the lock, and
@@ -525,7 +586,7 @@ decoder reports (§6, §8). Both add the line-level transactions of §11.8.
 | `rate` | enum | `auto`, `gen1`, `gen2` | `auto` | both |
 | `invert` | bool | | `false` | both |
 | `scrambling` | enum | `auto`, `on`, `off` | `auto` | both |
-| `coalesce` | bool | | `true` | `pcie_serial` |
+| `coalesce` | bool | | `true` | both (§7, §8.3) |
 | `show_idle` | bool | | `false` | `pcie_serial` |
 
 `enum_labels`: rate `{"auto": "Detect", "gen1": "2.5 GT/s (Gen1)", "gen2":
