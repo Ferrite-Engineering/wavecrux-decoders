@@ -65,6 +65,27 @@ WCX_TEST(full_manifest) {
     wcx_manifest_free(&m);
 }
 
+WCX_TEST(auto_bind_names) {
+    const char *json = "{\"signals\":[{\"name\":\"clk\"},{\"name\":\"k\",\"auto_bind\":"
+                       "{\"aliases\":[\"data_k\"],\"suffixes\":[\"_data_k\",\"_k\"]}}],"
+                       "\"optional_signals\":[{\"name\":\"v\",\"auto_bind\":{\"aliases\":null}},"
+                       "{\"name\":\"w\",\"auto_bind\":null}]}";
+    wcx_manifest m;
+    wcx_error err = {{0}};
+    WCX_REQUIRE(wcx_manifest_parse(&m, json, &err));
+    WCX_REQUIRE(m.signal_count == 4);
+    WCX_CHECK_EQ_U64(m.signals[0].auto_bind, WCX_JSON_NONE);
+    WCX_CHECK_EQ_U64(m.signals[3].auto_bind, WCX_JSON_NONE); // null -> absent
+    const size_t ab = m.signals[1].auto_bind;
+    WCX_REQUIRE(ab != WCX_JSON_NONE);
+    const size_t suffixes = wcx_jdoc_member(&m.doc, ab, "suffixes");
+    WCX_REQUIRE(suffixes != WCX_JSON_NONE);
+    WCX_CHECK_EQ_U64(m.doc.toks[suffixes].size, 2);
+    WCX_CHECK(wcx_jdoc_string_equals(&m.doc, suffixes + 1, "_data_k"));
+    WCX_CHECK(m.signals[2].auto_bind != WCX_JSON_NONE);
+    wcx_manifest_free(&m);
+}
+
 WCX_TEST(minimal_manifests) {
     WCX_CHECK(parses("{}"));
     WCX_CHECK(parses("{\"signals\":null,\"parameters\":null}"));
@@ -107,6 +128,13 @@ WCX_TEST(rejects_what_the_loader_rejects) {
         "not json",
         "{\"signals\":[{\"name\":\"a\",\"bit_width\":-1}]}",
         "{\"signals\":[{\"name\":\"a\",\"bit_width\":5000}]}",
+        // ABI 1.3 auto_bind: an object of arrays of non-empty strings.
+        "{\"signals\":[{\"name\":\"a\",\"auto_bind\":[]}]}",
+        "{\"signals\":[{\"name\":\"a\",\"auto_bind\":\"a_k\"}]}",
+        "{\"signals\":[{\"name\":\"a\",\"auto_bind\":{\"aliases\":\"x\"}}]}",
+        "{\"signals\":[{\"name\":\"a\",\"auto_bind\":{\"aliases\":[1]}}]}",
+        "{\"signals\":[{\"name\":\"a\",\"auto_bind\":{\"suffixes\":[\"\"]}}]}",
+        "{\"optional_signals\":[{\"name\":\"a\",\"auto_bind\":{\"suffixes\":{}}}]}",
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
         if (parses(bad[i])) {
@@ -137,6 +165,7 @@ int main(void) {
     wcx_test t = WCX_TEST_INIT;
     WCX_RUN(&t, full_manifest);
     WCX_RUN(&t, minimal_manifests);
+    WCX_RUN(&t, auto_bind_names);
     WCX_RUN(&t, rejects_what_the_loader_rejects);
     WCX_RUN(&t, too_many_signals);
     return wcx_test_finish(&t);

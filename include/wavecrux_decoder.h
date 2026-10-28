@@ -11,7 +11,7 @@
 // ABI (C, C++, Rust, Zig, …). Authors compile against this header and ship
 // the resulting library.
 //
-// Status: Experimental, ABI version 1.2. This contract follows the
+// Status: Experimental, ABI version 1.3. This contract follows the
 // versioning policy described in `CONTRIBUTING.md` ("Contributing a decoder
 // plugin"). The short version:
 //
@@ -84,7 +84,7 @@ extern "C" {
 // whose MAJOR component does not match the host's MAJOR.
 
 #define WAVECRUX_DECODER_ABI_MAJOR 1
-#define WAVECRUX_DECODER_ABI_MINOR 2
+#define WAVECRUX_DECODER_ABI_MINOR 3
 
 // The combined version word: (MAJOR << 16) | MINOR. Returned by
 // `wavecrux_decoder_abi_version`. Use the helper macros
@@ -147,6 +147,12 @@ typedef struct WcSample {
 // fields — the same shape the open-core decoders emit through
 // `DecodedTransaction.fields`. Both strings are owned by the plugin and
 // must remain valid until the next call on the same handle.
+//
+// ABI 1.3 reserves one `fields_json` key, `short_label`: an abbreviated
+// label (e.g. "UFC-NP" for "UpdateFC-NP VC0 H=0x01 D=0x040") the waveform
+// lane draws when the block is too narrow for `label`. The full `label` is
+// shown on hover and in the transaction table, and `short_label` is not
+// listed as a field. An older host shows it as an ordinary field.
 typedef struct WcTransaction {
     uint64_t    start_fs;     // Transaction start time, femtoseconds.
     uint64_t    end_fs;       // Transaction end time, femtoseconds.
@@ -243,6 +249,19 @@ typedef struct WcDecoderDef {
     // makes the manifest invalid. An older host ignores both keys and
     // packs at `bit_width`, so one decoder still works there when bound to
     // signals of that width.
+    //
+    // ABI 1.3 adds an optional `auto_bind` object to a signal entry, naming
+    // extra leaf names the host's auto-bind may match for that signal:
+    //
+    //   {"name": "datak", "bit_width": 8,
+    //    "auto_bind": {"aliases": ["data_k"],
+    //                  "suffixes": ["_data_k", "_datak"]}}
+    //
+    // `aliases` match a whole leaf name, `suffixes` its ending, both
+    // case-insensitively, and both must be arrays of non-empty strings. They
+    // are tried after an exact name match and before a fuzzy one; where a
+    // suffix matches on several buses, the bus the other signals were found
+    // on wins. An older host ignores the key.
     const char* manifest_json;
 
     // Lifecycle callbacks. All are required in ABI 1.0.
