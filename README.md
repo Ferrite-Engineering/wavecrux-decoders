@@ -13,9 +13,9 @@ them and trust what they download.
 
 | Plugin | Decoders | Decodes | Status |
 |---|---|---|---|
-| [PCIe](decoders/pcie/) | **PCIe PIPE** (`ferrite.pcie_pipe_w8/16/32/64`) | PCI Express Gen1/Gen2 at the PIPE interface: training sets (TS1, TS2), SKP, FTS, electrical idle, TLP and DLLP framing, RxStatus, symbol errors | 0.2.0, preview |
-| | **PCIe Data Link Layer** (`ferrite.pcie_dll_w8/16/32/64`) | DLLPs (Ack, Nak, flow control, power management) with CRC-16 checks, TLPs with sequence tracking, replays and LCRC checks | 0.2.0, preview |
-| | **PCIe serial line** (`ferrite.pcie_serial`, `ferrite.pcie_serial_dll`) | Both views from the 1-bit serial line of a SerDes model: bit recovery, Gen1/Gen2 rate detection, symbol lock, 8b/10b and disparity errors, electrical idle | 0.2.0, preview |
+| [PCIe](decoders/pcie/) | **PCIe PIPE** (`ferrite.pcie_pipe_w8/16/32/64`) | PCI Express Gen1/Gen2 at the PIPE interface, x1 to x16 lanes: training sets (TS1, TS2), SKP, FTS, electrical idle, TLP and DLLP framing, RxStatus, symbol errors | 0.3.0, preview |
+| | **PCIe Data Link Layer** (`ferrite.pcie_dll_w8/16/32/64`) | DLLPs (Ack, Nak, flow control, power management) with CRC-16 checks, TLPs with sequence tracking, replays and LCRC checks | 0.3.0, preview |
+| | **PCIe serial line** (`ferrite.pcie_serial`, `ferrite.pcie_serial_dll`) | Both views from the 1-bit serial line of a SerDes model: bit recovery, Gen1/Gen2 rate detection, symbol lock, 8b/10b and disparity errors, electrical idle | 0.3.0, preview |
 | [PCIe TLP](decoders/pcie-tlp/) (Chili.CHIPS) | **TLP Downstream**, **TLP Upstream** (`openpcie.pcie_tlp_down`, `_up`) | Transaction Layer Packets from a one-DW-per-clock stream: memory, I/O, configuration (register names), completions paired with their requests, messages; framing and length errors | 0.1.1, preview |
 
 The PIPE and Data Link Layer decoders are registered once per PIPE data
