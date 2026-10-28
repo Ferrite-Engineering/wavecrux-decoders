@@ -137,6 +137,28 @@ static void close_packet(pcie_pipeline *p, const pcie_sym *s, bool edb) {
         p->step_end_fs = ev.end_fs;
     }
     p->state = PST_OUT;
+    // §12.10: PADs after an END/EDB before the end of its row are fill.
+    p->row_fill = s->width >= 2u && s->pos + 1u < s->width;
+    report(p, &ev);
+}
+
+// §12.10: on a row of an x2/x4 link a packet starts on logical lane 0; on
+// x8 and wider on a multiple of 4. The packet is still framed from it.
+static void check_start_lane(pcie_pipeline *p, const pcie_sym *s) {
+    if (s->width < 2u) {
+        return;
+    }
+    const bool ok = s->width <= 4u ? s->pos == 0u : s->pos % 4u == 0u;
+    if (ok) {
+        return;
+    }
+    pcie_event ev;
+    memset(&ev, 0, sizeof ev);
+    ev.kind = PCIE_EV_FRAMING_LANE;
+    ev.start_fs = s->start_fs;
+    ev.end_fs = s->end_fs;
+    ev.u.lane_sym.symbol = s->byte;
+    ev.u.lane_sym.lane = s->lane;
     report(p, &ev);
 }
 
@@ -160,6 +182,13 @@ static void start_os(pcie_pipeline *p, const pcie_sym *s) {
     p->os_n = 0;
     p->os_last = s->byte;
     memset(&p->ts, 0, sizeof p->ts);
+    // §12.9: the per-lane view the lane layer gave for this COM, if any.
+    memset(&p->os_lanes, 0, sizeof p->os_lanes);
+    if (p->next_os_lanes != NULL) {
+        p->os_lanes = *p->next_os_lanes;
+        p->next_os_lanes = NULL;
+    }
+    p->ts.lanes = p->os_lanes;
     p->unit_start_fs = s->start_fs;
     p->unit_end_fs = s->end_fs;
 }
@@ -184,6 +213,7 @@ static void complete_os(pcie_pipeline *p, uint64_t end_fs, pcie_event_kind kind,
     ev.start_fs = p->unit_start_fs;
     ev.end_fs = end_fs;
     ev.u.count = count;
+    ev.lanes = p->os_lanes;
     p->state = PST_OUT;
     report(p, &ev);
 }
@@ -233,13 +263,18 @@ static void out_symbol(pcie_pipeline *p, const pcie_sym *s, uint8_t value) {
         run_extend(p, value == PCIE_D_IDLE ? PCIE_RUN_IDLE : PCIE_RUN_STRAY, s, value);
         return;
     }
-    run_end(p);
+    // §12.12: a PAD in a row does not split an Idle run, so a lane stuck on
+    // PAD in idle rows gives one Idle run beside its pad_misplaced run.
+    if (!(s->byte == PCIE_K_PAD && s->width >= 2u && p->run == PCIE_RUN_IDLE)) {
+        run_end(p);
+    }
     switch (s->byte) {
         case PCIE_K_COM:
             start_os(p, s);
             break;
         case PCIE_K_STP:
         case PCIE_K_SDP:
+            check_start_lane(p, s);
             open_packet(p, s, s->byte == PCIE_K_STP);
             break;
         case PCIE_K_END:
@@ -247,6 +282,24 @@ static void out_symbol(pcie_pipeline *p, const pcie_sym *s, uint8_t value) {
             report_symbol_error(p, PCIE_EV_UNMATCHED_END, s, s->byte);
             break;
         case PCIE_K_PAD:
+            if (s->width >= 2u) {
+                // §12.10: row fill after END/EDB is dropped; any other PAD
+                // outside a packet is misplaced.
+                if (!p->row_fill) {
+                    pcie_event ev;
+                    memset(&ev, 0, sizeof ev);
+                    ev.kind = PCIE_EV_PAD_MISPLACED;
+                    ev.start_fs = s->start_fs;
+                    ev.end_fs = s->end_fs;
+                    ev.u.lane_sym.symbol = s->byte;
+                    ev.u.lane_sym.lane = s->lane;
+                    report(p, &ev);
+                }
+                break;
+            }
+            // §10.2: a control symbol outside any packet or ordered set.
+            report_symbol_error(p, PCIE_EV_UNEXPECTED_K, s, s->byte);
+            break;
         case PCIE_K_SKP:
         case PCIE_K_FTS:
         case PCIE_K_IDL:
@@ -278,6 +331,7 @@ static void pkt_symbol(pcie_pipeline *p, const pcie_sym *s, uint8_t value) {
         case PCIE_K_STP:
         case PCIE_K_SDP:
             truncate_packet(p, s->byte == PCIE_K_STP ? PCIE_TRUNC_STP : PCIE_TRUNC_SDP);
+            check_start_lane(p, s);
             open_packet(p, s, s->byte == PCIE_K_STP);
             break;
         default:
@@ -403,7 +457,11 @@ static uint8_t descramble(pcie_pipeline *p, const pcie_sym *s, bool *discard) {
         return s->byte;
     }
     uint8_t value = s->byte;
-    if (!s->k) {
+    if (!s->k && s->has_plain) {
+        // §12.7: a row symbol of a multi-lane link, descrambled by its own
+        // lane. This LFSR still steps, but no row symbol reads it.
+        value = s->plain;
+    } else if (!s->k) {
         if (!p->synced) {
             *discard = true;
         } else if (!in_unscrambled_os(p, s)) {
@@ -431,9 +489,17 @@ void pcie_pipeline_init(pcie_pipeline *p, bool descramble_on, pcie_event_fn fn, 
     p->state = PST_OUT;
 }
 
+void pcie_pipeline_set_os_lanes(pcie_pipeline *p, const pcie_os_lanes *lanes) {
+    p->next_os_lanes = lanes;
+}
+
 void pcie_pipeline_symbol(pcie_pipeline *p, const pcie_sym *s) {
     p->step_valid_packet = false;
     p->step_disable_scrambling = false;
+    // §12.10: row fill is a PAD later in the same row.
+    if (p->row_fill && !(s->k && s->byte == PCIE_K_PAD && s->width >= 2u && s->pos != 0u)) {
+        p->row_fill = false;
+    }
     bool discard = false;
     const uint8_t value = descramble(p, s, &discard);
     if (discard) {
@@ -534,6 +600,7 @@ static pcie_trunc_by gating_trunc(pcie_break_reason reason) {
 }
 
 void pcie_pipeline_break(pcie_pipeline *p, pcie_break_reason reason) {
+    p->row_fill = false;
     if (reason == PCIE_BREAK_FLUSH) {
         flush_stream(p);
         return;

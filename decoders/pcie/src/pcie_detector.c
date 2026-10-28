@@ -174,6 +174,13 @@ void pcie_detector_break(pcie_detector *det, pcie_break_reason reason) {
     }
 }
 
+void pcie_detector_set_os_lanes(pcie_detector *det, const pcie_os_lanes *lanes) {
+    // After the lock the loser is never fed again; setting it is harmless.
+    for (unsigned i = 0; i < det->branches; i++) {
+        pcie_pipeline_set_os_lanes(&det->br[i].pipe, lanes);
+    }
+}
+
 wcx_arena *pcie_detector_arena(pcie_detector *det) {
     return det->locked ? wcx_decoder_arena(det->d) : &det->arena;
 }
@@ -192,8 +199,19 @@ void pcie_detector_emit(pcie_detector *det, uint64_t start_fs, uint64_t end_fs, 
     }
 }
 
+void pcie_detector_set_runs(pcie_detector *det) {
+    for (unsigned i = 0; i < det->branches; i++) {
+        det->br[i].sink.runs = true;
+    }
+}
+
 void pcie_detector_end_of_trace(pcie_detector *det) {
     pcie_detector_break(det, PCIE_BREAK_FLUSH);
+    for (unsigned i = 0; i < det->branches; i++) {
+        if (!det->locked || i == det->winner) {
+            pcie_sink_end_run(&det->br[i].sink);
+        }
+    }
 }
 
 void pcie_detector_finish(pcie_detector *det, uint64_t now_fs) {

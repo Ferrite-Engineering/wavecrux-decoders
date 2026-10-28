@@ -88,6 +88,24 @@ void pcie_fe_emit_dllp_edb(pcie_sink *sink, const pcie_event *ev) {
     pcie_sink_emit(sink, ev->start_fs, ev->end_fs, "DLLP ended by EDB", wcx_json_end(&j), true);
 }
 
+// §12.10, §12.12: `STP on lane 2`.
+static void emit_framing_lane(pcie_sink *sink, const pcie_event *ev) {
+    wcx_arena *a = pcie_sink_arena(sink);
+    const unsigned lane = ev->u.lane_sym.lane;
+    wcx_json j;
+    wcx_json_begin(&j, a);
+    wcx_json_add_str(&j, "type", "framing_lane");
+    wcx_json_add_hex(&j, "symbol", ev->u.lane_sym.symbol, 2);
+    wcx_json_add_u64(&j, "lane", lane);
+    wcx_json_add_str(&j, "error",
+                     "A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 "
+                     "(x8 and wider).");
+    pcie_sink_emit(sink, ev->start_fs, ev->end_fs,
+                   wcx_arena_printf(a, "%s on lane %u",
+                                    ev->u.lane_sym.symbol == PCIE_K_STP ? "STP" : "SDP", lane),
+                   wcx_json_end(&j), true);
+}
+
 void pcie_fe_emit_error(pcie_sink *sink, const pcie_event *ev) {
     wcx_arena *a = pcie_sink_arena(sink);
     const unsigned sym = ev->u.symbol;
@@ -108,6 +126,11 @@ void pcie_fe_emit_error(pcie_sink *sink, const pcie_event *ev) {
                               "A control symbol appeared outside an ordered set or packet.");
             break;
         case PCIE_EV_UNKNOWN_OS:
+            if (sink->runs) {
+                // §12.12: repeated on a multi-lane link, it forms a run.
+                pcie_sink_run(sink, PCIE_ERR_UNKNOWN_OS, sym, ev->start_fs, ev->end_fs);
+                break;
+            }
             emit_symbol_error(sink, ev, "unknown_os", "Unknown ordered set",
                               "COM was not followed by a recognised ordered set.");
             break;
@@ -119,6 +142,13 @@ void pcie_fe_emit_error(pcie_sink *sink, const pcie_event *ev) {
             break;
         case PCIE_EV_STRAY_RUN:
             emit_stray(sink, ev);
+            break;
+        case PCIE_EV_FRAMING_LANE:
+            emit_framing_lane(sink, ev);
+            break;
+        case PCIE_EV_PAD_MISPLACED:
+            // §12.10 needs a row of two lanes or more, so the sink forms runs.
+            pcie_sink_run(sink, PCIE_ERR_PAD, ev->u.lane_sym.lane, ev->start_fs, ev->end_fs);
             break;
         case PCIE_EV_TS:
         case PCIE_EV_SKP:

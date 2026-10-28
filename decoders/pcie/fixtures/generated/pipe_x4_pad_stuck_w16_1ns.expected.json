@@ -1,0 +1,16 @@
+[
+{"startTime":8,"endTime":136,"label":"TS1 ×2 link=PAD lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"PAD,PAD,PAD,PAD","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":136,"endTime":200,"label":"TS1 link=0 lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","links":"0,0,0,0","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":200,"endTime":328,"label":"TS1 ×2 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":328,"endTime":520,"label":"TS2 ×3 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":456,"endTime":520,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
+{"startTime":456,"endTime":520,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
+{"startTime":520,"endTime":576,"label":"Idle ×44","isError":false,"fields":{"type":"idle","symbols":"44"}},
+{"startTime":528,"endTime":576,"label":"PAD outside a packet (lane 2) (12 times)","isError":true,"fields":{"type":"pad_misplaced","lane":"2","error":"PAD outside a packet is valid only as fill after END or EDB.","occurrences":"12"}},
+{"startTime":576,"endTime":584,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":584,"endTime":596,"label":"PAD outside a packet (lane 2) (3 times)","isError":true,"fields":{"type":"pad_misplaced","lane":"2","error":"PAD outside a packet is valid only as fill after END or EDB.","occurrences":"3"}},
+{"startTime":584,"endTime":608,"label":"Idle ×20","isError":false,"fields":{"type":"idle","symbols":"20"}},
+{"startTime":596,"endTime":600,"label":"PAD outside a packet (lane 1)","isError":true,"fields":{"type":"pad_misplaced","lane":"1","error":"PAD outside a packet is valid only as fill after END or EDB."}},
+{"startTime":608,"endTime":624,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}},
+{"startTime":624,"endTime":632,"label":"Idle ×8","isError":false,"fields":{"type":"idle","symbols":"8"}}
+]

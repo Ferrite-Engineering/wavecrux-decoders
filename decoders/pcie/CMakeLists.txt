@@ -19,6 +19,7 @@ wcx_add_decoder(
                  src/pcie_pipe_fe.c
                  src/pcie_dll_fe.c
                  src/pcie_detector.c
+                 src/pcie_lanes.c
                  src/pcie_line.c
                  src/pcie_serial_plugin.c
                  src/pcie_plugin.c

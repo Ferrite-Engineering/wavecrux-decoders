@@ -1,0 +1,10 @@
+[
+{"startTime":52400,"endTime":53200,"label":"InitFC1-P VC0 H=32 D=1008","isError":false,"fields":{"type":"initfc1_p","vc":"0","hdr_fc":"32","data_fc":"1008","crc":"0x35BC"}},
+{"startTime":52400,"endTime":53200,"label":"Scrambling: off (detected)","isError":false,"fields":{"type":"scrambling_detected","mode":"off"}},
+{"startTime":53200,"endTime":53600,"label":"SDP on lane 2","isError":true,"fields":{"type":"framing_lane","symbol":"0x5C","lane":"2","error":"A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 (x8 and wider)."}},
+{"startTime":53200,"endTime":54400,"label":"Ack seq=0","isError":false,"fields":{"type":"ack","seq":"0","crc":"0xB362"}},
+{"startTime":54400,"endTime":54800,"label":"PAD outside a packet (lane 3)","isError":true,"fields":{"type":"pad_misplaced","lane":"3","error":"PAD outside a packet is valid only as fill after END or EDB."}},
+{"startTime":54800,"endTime":57200,"label":"TLP seq=0 MWr32 len=1","isError":false,"fields":{"type":"tlp","seq":"0","tlp":"MWr32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"16","lcrc":"0x304A5E71","replay":"false"}},
+{"startTime":57200,"endTime":57600,"label":"STP on lane 1","isError":true,"fields":{"type":"framing_lane","symbol":"0xFB","lane":"1","error":"A packet starts on lane 0 (x2, x4) or on a lane that is a multiple of 4 (x8 and wider)."}},
+{"startTime":57200,"endTime":59600,"label":"TLP seq=1 MRd32 len=1","isError":false,"fields":{"type":"tlp","seq":"1","tlp":"MRd32","length_dw":"1","tc":"0","td":"false","ep":"false","bytes":"12","lcrc":"0xFBE7E2EA","replay":"false"}}
+]

@@ -38,6 +38,7 @@ static inline void feed_syms(pcie_pipeline *p, const tsym *syms, size_t n, uint6
                              uint64_t dur) {
     for (size_t i = 0; i < n; i++) {
         pcie_sym s;
+        memset(&s, 0, sizeof s);
         s.byte = syms[i].byte;
         s.k = syms[i].k;
         s.start_fs = t0 + (uint64_t)i * dur;

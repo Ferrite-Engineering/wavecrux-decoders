@@ -93,6 +93,8 @@ $dumpvars(0, tb.dut.phy.RxDataK);
 | `sample_point` | `before_edge`, `at_edge` | `before_edge` | both | `before_edge` reads the values a flip-flop captures in a zero-delay RTL dump (data changing on the same timestamp as the clock); `at_edge` reads the values present at the edge |
 | `coalesce` | bool | `true` | PIPE | One transaction per run of identical TS1, TS2, FTS or EIEOS ordered sets, with a `count` (`TS1 ×1024 …`) |
 | `show_idle` | bool | `false` | PIPE | One transaction per run of logical idle symbols |
+| `max_skew` | 0 to 64 | `8` | both | Multi-lane links: how many symbols apart the lanes' copies of one ordered set may be and still line up |
+| `lane_order` | `auto`, `physical` | `auto` | both | Multi-lane links: `auto` takes the logical lane order from the TS1/TS2 Lane#, so a reversed link decodes |
 
 ## What you see
 
@@ -114,6 +116,32 @@ field, and never stop the decode: it resynchronises at the next symbol.
   COM, `rxvalid`, `txelecidle` or the end of the trace), END/EDB without a
   start, data outside a packet, unknown ordered sets, X/Z on the data bus,
   PHY-reported RxStatus errors.
+
+## Multi-lane links
+
+Bind lanes 1 to 15 next to lane 0: `data1`/`datak1`, `data2`/`datak2`, …,
+and optionally `rxvalid<l>`, `txelecidle<l>` and `rxstatus<l>`, all of lane
+0's widths. Bind lanes 0 to B-1, with B = 1, 2, 4, 8, 12 or 16; anything
+else is reported and nothing is decoded. Auto-bind matches `TxData1`,
+`TxDataK1` (and `RxData1`, …) the way it matches lane 0.
+
+The decoders deskew the lanes on their ordered sets (up to `max_skew`
+symbols), take the link width from the TS2s at the end of training (or from
+the first SKP in a trace that starts in L0), un-stripe the packets and check
+the start lane and PAD fill. A link that trains narrower than its binding
+is fine: the lanes outside it are ignored. The contract is
+[`SPEC.md`](SPEC.md) §12. On top of the x1 output:
+
+- `Link width x2 (4 bound)` and `Lane order 3,2,1,0` (PIPE).
+- `Lanes aligned x4 (offsets 0,1,0,2)` at each lock (PIPE), and
+  `Lanes not aligned (lane 2)` when the lanes stop lining up.
+- Per-lane fields: `TS1 ×4 link=0 lanes=0,1,2,3 n_fts=24 gen1`,
+  `SKP ×3,3,2,3`, and `Lane 1 differs: TS2, lane 0 TS1` (PIPE).
+- `STP on lane 2` and `PAD outside a packet (lane 5)`.
+- `Packet data before lane alignment`: packets before the first lock, not
+  decoded (normal for a trace that starts in L0); after a loss, the same as
+  an error.
+- RxStatus names its lane: `RxStatus: SKP added (lane 2)`.
 
 ## Serial line decoders
 
@@ -156,9 +184,14 @@ stops on a held level is lost. With a lot of jitter on a Gen1 line, set
 
 ## Limits
 
-- **x1 links only**, for the serial decoders too (one lane, no deskew). A multi-lane link stripes symbols across lanes and
-  needs lane deskew; bound to lane 0 of a wider link the PIPE decoder still
-  shows the ordered sets, but packets will appear broken.
+- The serial line decoders are x1 only. The PIPE and DLL decoders take up
+  to x16 (no x32).
+- A link decided at the end of training can shrink at a later TS2 run
+  (Recovery) but not grow: lanes left outside are no longer watched. A link
+  taken from the first SKP widens at a later SKP that more lanes carry.
+- Skew beyond `max_skew` is not detected as such: on back-to-back TS1/TS2 a
+  lane that late can pair with the next ordered set and lose alignment at
+  the first row. Raise `max_skew` for slow simulation models.
 - Gen1/Gen2 (8b/10b) only; no 128b/130b, no Gen3 equalisation TS fields.
 - The DLL decoder's header decode is deliberately light (name, Length, TC,
   TD, EP). It does not check ECRC and does not interpret addresses, requester
@@ -204,7 +237,7 @@ ctest --preset dev -R pcie
 ```
 
 `tests/unit_*.c` hold the unit tests (CRCs, scrambler, 8b/10b, framing,
-both front ends, the serial line front end, scrambling detection and the
-plugin's ABI behaviour), `tests/vcd/`
+both front ends, the serial line front end, scrambling detection, the
+plugin's ABI behaviour and multi-lane links), `tests/vcd/`
 hand-derived smoke fixtures, `fixtures/` the independently generated golden
 fixtures, and `fuzz/` the libFuzzer target and its seed corpus.

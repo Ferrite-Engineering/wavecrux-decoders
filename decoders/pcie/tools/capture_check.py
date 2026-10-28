@@ -56,10 +56,18 @@ def check() -> list[str]:
     return bad
 
 
+def multilane(bindings: str) -> bool:
+    """The reference decoder is x1 only; SPEC §12 fixtures bind data1.."""
+    with open(bindings, encoding="utf-8") as f:
+        return "data1" in json.load(f)["signal_bindings"]
+
+
 def cross_check(d: str) -> list[str]:
     out = []
     for stem in stems(d):
         p = os.path.join(d, stem)
+        if multilane(p + ".bindings.json"):
+            continue
         got = ref_output(p + ".vcd", p + ".bindings.json").splitlines()
         with open(p + ".expected.json", encoding="utf-8") as f:
             want = f.read().splitlines()

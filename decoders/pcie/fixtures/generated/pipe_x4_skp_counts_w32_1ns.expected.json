@@ -1,0 +1,17 @@
+[
+{"startTime":16,"endTime":144,"label":"TS1 ×2 link=PAD lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"PAD,PAD,PAD,PAD","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":144,"endTime":208,"label":"TS1 link=0 lanes=PAD,PAD,PAD,PAD n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"1","links":"0,0,0,0","lanes":"PAD,PAD,PAD,PAD","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":208,"endTime":336,"label":"TS1 ×2 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts1","count":"2","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":336,"endTime":528,"label":"TS2 ×3 link=0 lanes=0,1,2,3 n_fts=24 gen1","isError":false,"fields":{"type":"ts2","count":"3","links":"0,0,0,0","lanes":"0,1,2,3","n_fts":"24","rate_id":"0x02","training_control":"0x00","hot_reset":"false","disable_link":"false","loopback":"false","disable_scrambling":"false","compliance_receive":"false"}},
+{"startTime":464,"endTime":528,"label":"Lanes aligned x4 (offsets 0,0,0,0)","isError":false,"fields":{"type":"lanes_aligned","width":"4","offsets":"0,0,0,0"}},
+{"startTime":464,"endTime":528,"label":"Link width x4 (4 bound)","isError":false,"fields":{"type":"link_width","width":"4","bound":"4","lanes":"0,1,2,3","from":"ts2"}},
+{"startTime":544,"endTime":552,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":552,"endTime":576,"label":"TLP frame seq=0 (22 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"0","symbols":"22","end":"END"}},
+{"startTime":576,"endTime":592,"label":"RxStatus: SKP removed (lane 2)","isError":false,"fields":{"type":"rxstatus","code":"0b010","lane":"2"}},
+{"startTime":576,"endTime":592,"label":"SKP ×3,3,2,3","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,2,3"}},
+{"startTime":608,"endTime":620,"label":"DLLP frame (6 symbols)","isError":false,"fields":{"type":"dllp_frame","symbols":"6","end":"END"}},
+{"startTime":624,"endTime":640,"label":"RxStatus: SKP added (lane 2)","isError":false,"fields":{"type":"rxstatus","code":"0b001","lane":"2"}},
+{"startTime":628,"endTime":644,"label":"SKP ×3,3,4,3","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,4,3"}},
+{"startTime":656,"endTime":676,"label":"TLP frame seq=1 (18 symbols)","isError":false,"fields":{"type":"tlp_frame","seq":"1","symbols":"18","end":"END"}},
+{"startTime":688,"endTime":704,"label":"SKP","isError":false,"fields":{"type":"skp","skp_symbols":"3,3,3,3"}}
+]

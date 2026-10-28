@@ -41,9 +41,10 @@
 #include "wcx/error.h"
 #include "wcx/export.h"
 
-// Ceilings: no supported protocol binds more than 64 signals, and the widest
-// bus a decoder reads is far below 4096 bits.
-#define WCX_MAX_SIGNALS     64u
+// Ceilings: no supported protocol binds more than 128 signals (a x16 PCIe
+// PIPE link declares 81), and the widest bus a decoder reads is far below
+// 4096 bits.
+#define WCX_MAX_SIGNALS     128u
 #define WCX_MAX_SIGNAL_BITS 4096u
 
 // One signal, as declared in the manifest.
